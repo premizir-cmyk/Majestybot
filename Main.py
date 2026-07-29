@@ -7,7 +7,7 @@ import json
 import os
 from datetime import datetime
 
-TOKEN ='8502077117:AAEHUXtn-7zExbSLk5LMGNSXnR9_1mjM2YA'
+TOKEN = '8502077117:AAEHUXtn-7zExbSLk5LMGNSXnR9_1mjM2YA'
 CHANNEL_ID = '@majestypublic'
 BOT_USERNAME = '@Magestyper2_bot'
 MY_USERNAME = '@premizir' # Твой юзернейм для связи
@@ -56,8 +56,9 @@ def save_data(filename, data):
     except Exception as e:
         print(f"Ошибка сохранения {filename}: {e}")
 
+# ИСПРАВЛЕНО: Теперь правильная проверка элемента в списке
 def is_owner(user_id):
-    return user_id == OWNER_ID
+    return user_id in OWNER_ID
 
 def is_user_active(user_id):
     if is_owner(user_id):
@@ -568,13 +569,15 @@ def handle_post(message):
         }
         save_data(POSTS_FILE, posts_data)
 
+        # ИСПРАВЛЕНО: Теперь лог о новом посте отправляется обоим администраторам из списка
         if not is_owner(user_id):
             user_tag = f"@{username}" if username else f"ID {user_id}"
             admin_log = f"📩 **Новый пост в канале!**\n👤 Автор: {user_tag}\n📝 Текст:\n{post_text}"
-            try:
-                bot.send_message(OWNER_ID, admin_log, parse_mode="Markdown")
-            except:
-                pass
+            for admin_id in OWNER_ID:
+                try:
+                    bot.send_message(admin_id, admin_log, parse_mode="Markdown")
+                except:
+                    pass
 
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка публикации: {e}")
