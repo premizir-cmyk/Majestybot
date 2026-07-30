@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 
 TOKEN = '8502077117:AAEHUXtn-7zExbSLk5LMGNSXnR9_1mjM2YA'
-CHANNEL_ID = '@titanpublicccc'
+CHANNEL_ID = -1003353227659
 BOT_USERNAME = '@Magestyper2_bot'
 MY_USERNAME = '@premizir' # Твой юзернейм для связи
 
