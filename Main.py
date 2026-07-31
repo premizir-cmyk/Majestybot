@@ -10,7 +10,7 @@ from datetime import datetime
 TOKEN = '8502077117:AAEHUXtn-7zExbSLk5LMGNSXnR9_1mjM2YA'
 CHANNEL_ID = -1003353227659
 BOT_USERNAME = '@Magestyper2_bot'
-MY_USERNAME = '@premizir' # Твой юзернейм для связи
+MY_USERNAME = '@premizir'  # Твой юзернейм для связи
 
 OWNER_ID = [7605961809, 685268569]
 
@@ -33,9 +33,10 @@ TEMPLATE_TEXT = """🔥ГОРЯЧИЙ СЛОТ
 
 RULES_TEXT = """⚠️ **ПРАВИЛА ПУБЛИКАЦИИ:**
 
-1. **Строго по шаблону!** Бот проверяет ключевые слова.
-2. **Кулдаун:** Между постами 2 часа 30 минут.
-3. **Запрещено:** Скамерство, спам, флуд.
+1. **Строго по шаблону!** Бот проверяет заполненость всех полей.
+2. **Без контактов в тексте!** Не указывайте @username или ссылки на связи в тексте — кнопка создается автоматически.
+3. **Кулдаун:** Между постами 2 часа 30 минут.
+4. **Запрещено:** Скамерство, спам, флуд.
 
 🚨 *За нарушение правил доступ аннулируется без возврата средств!*"""
 
@@ -56,7 +57,6 @@ def save_data(filename, data):
     except Exception as e:
         print(f"Ошибка сохранения {filename}: {e}")
 
-# ИСПРАВЛЕНО: Теперь правильная проверка элемента в списке
 def is_owner(user_id):
     return user_id in OWNER_ID
 
@@ -126,9 +126,66 @@ def format_time(seconds):
     else:
         return f"{minutes} мин."
 
-def close_post_in_channel(message_id, original_text=None, reason=None):
-    """Полное стирание информации и замена на плашку закрытия с рекламой бота"""
-    
+def validate_template(text):
+    if not text:
+        return False, "Текст сообщения отсутствует."
+
+    # 1. Запрет юзернеймов в тексте (кнопка добавляется автоматически)
+    if "@" in text:
+        return False, "В тексте **запрещено указывать юзернеймы (@...)**! Кнопка для связи добавляется автоматически под постом."
+
+    # 2. Список строго обязательных строк
+    required_keywords = [
+        "🔥ГОРЯЧИЙ СЛОТ",
+        "Площадка:",
+        "Оплата:",
+        "Что нужно делать, От себя:"
+    ]
+
+    for kw in required_keywords:
+        if kw not in text:
+            return False, f"Отсутствует обязательная строка: `{kw}`"
+
+    # 3. Проверка на добавление сторонних полей связи
+    forbidden_words = ["писать", "связь", "контакт", "лс", "директ", "tg:"]
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+
+    for line in lines:
+        line_lower = line.lower()
+        for forbidden in forbidden_words:
+            if forbidden in line_lower and "что нужно делать" not in line_lower:
+                return False, f"Запрещено добавлять поля для связи (слово `{forbidden}`). Вся связь идет только через кнопку под постом!"
+
+    # 4. Проверка заполнености полей
+    platform_filled = False
+    payment_filled = False
+    action_filled = False
+
+    for line in lines:
+        if "Площадка:" in line:
+            content = line.split("Площадка:", 1)[1].strip()
+            if len(content) >= 2:
+                platform_filled = True
+        elif "Оплата:" in line:
+            content = line.split("Оплата:", 1)[1].strip()
+            if len(content) >= 2:
+                payment_filled = True
+        elif "Что нужно делать, От себя:" in line:
+            content = line.split("Что нужно делать, От себя:", 1)[1].strip()
+            if len(content) >= 10:
+                action_filled = True
+
+    if not platform_filled:
+        return False, "Заполните поле **'Площадка:'**."
+    if not payment_filled:
+        return False, "Заполните поле **'Оплата:'**."
+    if not action_filled:
+        return False, "Заполните поле **'Что нужно делать, От себя:'** (минимум 10 символов описания)."
+
+    return True, "OK"
+
+def close_post_in_channel(message_id):
+    """Стирание информации и замена на плашку закрытия"""
     CLOSED_CARD = (
         "🔒 **[СЛОТ ЗАКРЫТ]**\n\n"
         "━━━━━⬍━━━━━\n"
@@ -138,7 +195,6 @@ def close_post_in_channel(message_id, original_text=None, reason=None):
     )
 
     try:
-        # Пробуем заменить текст (для текстовых постов)
         bot.edit_message_text(
             text=CLOSED_CARD,
             chat_id=CHANNEL_ID,
@@ -148,7 +204,6 @@ def close_post_in_channel(message_id, original_text=None, reason=None):
         )
         return True
     except Exception:
-        # Для постов с картинкой/видео: удаляем и отправляем чистую карточку
         try:
             bot.delete_message(chat_id=CHANNEL_ID, message_id=message_id)
             bot.send_message(
@@ -158,9 +213,7 @@ def close_post_in_channel(message_id, original_text=None, reason=None):
             )
             return True
         except Exception as e:
-            print(f"Ошибка при удалении/очистке поста {message_id}: {e}")
-            
-            # Резервный вариант
+            print(f"Ошибка при закрытии поста {message_id}: {e}")
             try:
                 bot.edit_message_caption(
                     caption=CLOSED_CARD,
@@ -173,7 +226,6 @@ def close_post_in_channel(message_id, original_text=None, reason=None):
             except:
                 return False
 
-# ЕДИНЫЙ ФОНОВЫЙ ПОТОК ПРОВЕРКИ АВТОЗАКРЫТИЯ
 def auto_close_checker():
     while True:
         try:
@@ -234,7 +286,6 @@ def get_main_menu_keyboard(user_id):
         types.InlineKeyboardButton(text="📖 Правила", callback_data="show_rules"),
         types.InlineKeyboardButton(text="⏳ Мой профиль / КД", callback_data="my_profile")
     )
-    # Кнопка связи с тобой для покупки бота
     markup.add(types.InlineKeyboardButton(text="🤖 Хочу такого же бота себе", url=f"https://t.me/premizir"))
     
     if is_owner(user_id):
@@ -256,7 +307,7 @@ def get_admin_help_text():
         "📜 `/history` — Посмотреть последние посты\n"
     )
 
-# ================= КОМАНДЫ ТОЛЬКО ДЛЯ ВЛАДЕЛЬЦА =================
+# ================= КОМАНДЫ ВЛАДЕЛЬЦА =================
 
 @bot.message_handler(commands=['adminhelp'])
 def admin_help_cmd(message):
@@ -349,13 +400,12 @@ def show_history(message):
         text += f"🕒 [{item['timestamp']}] {user_str}\n💬 {item['text'][:80]}...\n---\n"
     bot.reply_to(message, text)
 
-# ================= КОМАНДА ЗАКРЫТИЯ ПОСТА ВРУЧНУЮ =================
+# ================= ЗАКРЫТИЕ ПОСТА ВРУЧНУЮ =================
 
 @bot.message_handler(commands=['close'])
 def close_user_post(message):
     user_id = message.from_user.id
     posts_data = load_data(POSTS_FILE)
-    
     target_post_id = None
     
     if message.reply_to_message:
@@ -514,16 +564,25 @@ def handle_post(message):
         return
 
     post_text = message.text or message.caption or ""
-    
-    has_forbidden = "Писать строго сюда" in post_text
-    has_required = ("🔥ГОРЯЧИЙ СЛОТ" in post_text) and ("Площадка:" in post_text) and ("Оплата:" in post_text)
 
-    if has_forbidden or not has_required:
+    # Проверка на устаревшую строку
+    if "Писать строго сюда" in post_text:
+        bot.reply_to(
+            message,
+            "❌ **Запрещено использовать устаревшую строку 'Писать строго сюда'!**\n\n"
+            "Скопируйте актуальный шаблон из главного меню.",
+            parse_mode="Markdown"
+        )
+        return
+
+    # Строгая валидация шаблона
+    is_valid, error_msg = validate_template(post_text)
+
+    if not is_valid:
         bot.reply_to(
             message, 
-            "❌ **Неправильный шаблон!**\n\n"
-            "⚠️ *Убедитесь, что вы НЕ используете устаревшую строку 'Писать строго сюда'.*\n\n"
-            "👇 **Скопируйте актуальный чистый шаблон ниже:**\n\n" + f"<code>{TEMPLATE_TEXT}</code>", 
+            f"❌ **Ошибка в шаблоне:** {error_msg}\n\n"
+            "👇 **Скопируйте чистый шаблон и заполните все поля:**\n\n" + f"<code>{TEMPLATE_TEXT}</code>", 
             parse_mode="HTML"
         )
         return
@@ -569,7 +628,6 @@ def handle_post(message):
         }
         save_data(POSTS_FILE, posts_data)
 
-        # ИСПРАВЛЕНО: Теперь лог о новом посте отправляется обоим администраторам из списка
         if not is_owner(user_id):
             user_tag = f"@{username}" if username else f"ID {user_id}"
             admin_log = f"📩 **Новый пост в канале!**\n👤 Автор: {user_tag}\n📝 Текст:\n{post_text}"
