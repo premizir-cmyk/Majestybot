@@ -5,8 +5,11 @@ import threading
 import time
 import json
 import os
+import sys
+import signal
 from datetime import datetime
 
+# --- ОСНОВНЫЕ НАСТРОЙКИ ---
 TOKEN = '8502077117:AAEHUXtn-7zExbSLk5LMGNSXnR9_1mjM2YA'
 CHANNEL_ID = -1003353227659
 BOT_USERNAME = '@Magestyper2_bot'
@@ -15,16 +18,22 @@ MY_USERNAME = '@premizir'  # Твой юзернейм для связи
 OWNER_ID = [7605961809, 685268569]
 
 bot = telebot.TeleBot(TOKEN)
-DB_FILE = 'users.json'
-COOLDOWN_FILE = 'cooldowns.json'
-NOTIFIED_FILE = 'notified.json'
-HISTORY_FILE = 'history.json'
-POSTS_FILE = 'active_posts.json'
 
-COOLDOWN_TIME = 9000  # 2.5 часа (9000 сек)
-AUTO_CLOSE_TIME = 7200  # 2 часа (7200 сек)
+# Флаг для мягкой остановки бота и фоновых потоков
+is_running = True
 
-# ЧИСТЫЙ ШАБЛОН
+# --- НАСТРОЙКА ХРАНЕНИЯ ФАЙЛОВ НА BOTHOST ---
+DATA_DIR = '/app/data' if os.path.exists('/app/data') else '.'
+DB_FILE = os.path.join(DATA_DIR, 'users.json')
+COOLDOWN_FILE = os.path.join(DATA_DIR, 'cooldowns.json')
+NOTIFIED_FILE = os.path.join(DATA_DIR, 'notified.json')
+HISTORY_FILE = os.path.join(DATA_DIR, 'history.json')
+POSTS_FILE = os.path.join(DATA_DIR, 'active_posts.json')
+
+COOLDOWN_TIME = 9000   # 2.5 часа (9000 сек)
+AUTO_CLOSE_TIME = 7200 # 2 часа (7200 сек)
+
+# --- ТЕКСТЫ И ШАБЛОНЫ ---
 TEMPLATE_TEXT = """🔥ГОРЯЧИЙ СЛОТ
 
 ❣️ Площадка: 
@@ -33,12 +42,14 @@ TEMPLATE_TEXT = """🔥ГОРЯЧИЙ СЛОТ
 
 RULES_TEXT = """⚠️ **ПРАВИЛА ПУБЛИКАЦИИ:**
 
-1. **Строго по шаблону!** Бот проверяет заполненость всех полей.
+1. **Строго по шаблону!** Бот проверяет заполненность всех полей.
 2. **Без контактов в тексте!** Не указывайте @username или ссылки на связи в тексте — кнопка создается автоматически.
 3. **Кулдаун:** Между постами 2 часа 30 минут.
 4. **Запрещено:** Скамерство, спам, флуд.
 
 🚨 *За нарушение правил доступ аннулируется без возврата средств!*"""
+
+# --- ВПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
 def load_data(filename):
     if os.path.exists(filename):
@@ -64,7 +75,7 @@ def is_user_active(user_id):
     if is_owner(user_id):
         return True
     users = load_data(DB_FILE)
-    str_id = str(user_id)
+    str_id = str(user_id).strip()
     if str_id in users:
         expire_time = users[str_id]
         if time.time() < expire_time:
@@ -78,7 +89,7 @@ def get_cooldown_left(user_id):
     if is_owner(user_id):
         return 0
     cooldowns = load_data(COOLDOWN_FILE)
-    str_id = str(user_id)
+    str_id = str(user_id).strip()
     if str_id in cooldowns:
         last_post_time = cooldowns[str_id]
         elapsed = time.time() - last_post_time
@@ -90,12 +101,12 @@ def set_cooldown(user_id):
     if is_owner(user_id):
         return
     cooldowns = load_data(COOLDOWN_FILE)
-    cooldowns[str(user_id)] = time.time()
+    cooldowns[str(user_id).strip()] = time.time()
     save_data(COOLDOWN_FILE, cooldowns)
 
 def reset_cooldown(user_id):
     cooldowns = load_data(COOLDOWN_FILE)
-    str_id = str(user_id)
+    str_id = str(user_id).strip()
     if str_id in cooldowns:
         del cooldowns[str_id]
         save_data(COOLDOWN_FILE, cooldowns)
@@ -126,11 +137,13 @@ def format_time(seconds):
     else:
         return f"{minutes} мин."
 
+# --- ВАЛИДАЦИЯ ШАБЛОНА ---
+
 def validate_template(text):
     if not text:
         return False, "Текст сообщения отсутствует."
 
-    # 1. Запрет юзернеймов в тексте (кнопка добавляется автоматически)
+    # 1. Запрет юзернеймов в тексте
     if "@" in text:
         return False, "В тексте **запрещено указывать юзернеймы (@...)**! Кнопка для связи добавляется автоматически под постом."
 
@@ -156,7 +169,7 @@ def validate_template(text):
             if forbidden in line_lower and "что нужно делать" not in line_lower:
                 return False, f"Запрещено добавлять поля для связи (слово `{forbidden}`). Вся связь идет только через кнопку под постом!"
 
-    # 4. Проверка заполнености полей
+    # 4. Проверка заполненности полей
     platform_filled = False
     payment_filled = False
     action_filled = False
@@ -183,6 +196,8 @@ def validate_template(text):
         return False, "Заполните поле **'Что нужно делать, От себя:'** (минимум 10 символов описания)."
 
     return True, "OK"
+
+# --- ЛОГИКА ЗАКРЫТИЯ ПОСТА В КАНАЛЕ ---
 
 def close_post_in_channel(message_id):
     """Стирание информации и замена на плашку закрытия"""
@@ -226,8 +241,10 @@ def close_post_in_channel(message_id):
             except:
                 return False
 
+# --- ФОНОВЫЕ ПОТОКИ ---
+
 def auto_close_checker():
-    while True:
+    while is_running:
         try:
             posts_data = load_data(POSTS_FILE)
             now = time.time()
@@ -250,7 +267,7 @@ def auto_close_checker():
         time.sleep(30)
 
 def check_expiring_subscriptions():
-    while True:
+    while is_running:
         try:
             users = load_data(DB_FILE)
             notified = load_data(NOTIFIED_FILE)
@@ -277,7 +294,7 @@ def check_expiring_subscriptions():
             
         time.sleep(3600)
 
-# ================= ГЛАВНОЕ МЕНЮ И КНОПКИ =================
+# --- ГЛАВНОЕ МЕНЮ И КНОПКИ ---
 
 def get_main_menu_keyboard(user_id):
     markup = types.InlineKeyboardMarkup(row_width=2)
@@ -286,7 +303,7 @@ def get_main_menu_keyboard(user_id):
         types.InlineKeyboardButton(text="📖 Правила", callback_data="show_rules"),
         types.InlineKeyboardButton(text="⏳ Мой профиль / КД", callback_data="my_profile")
     )
-    markup.add(types.InlineKeyboardButton(text="🤖 Хочу такого же бота себе", url=f"https://t.me/premizir"))
+    markup.add(types.InlineKeyboardButton(text="🤖 Хочу такого же бота себе", url=f"https://t.me/{MY_USERNAME.replace('@', '')}"))
     
     if is_owner(user_id):
         markup.add(types.InlineKeyboardButton(text="🛠 Админ-панель", callback_data="open_admin_help"))
@@ -307,7 +324,7 @@ def get_admin_help_text():
         "📜 `/history` — Посмотреть последние посты\n"
     )
 
-# ================= КОМАНДЫ ВЛАДЕЛЬЦА =================
+# --- КОМАНДЫ ВЛАДЕЛЬЦА ---
 
 @bot.message_handler(commands=['adminhelp'])
 def admin_help_cmd(message):
@@ -321,8 +338,8 @@ def add_user(message):
         return
     try:
         args = message.text.split()
-        target_id = str(args[1])
-        days = int(args[2])
+        target_id = str(args[1]).strip()
+        days = float(args[2])
         users = load_data(DB_FILE)
         users[target_id] = time.time() + (days * 86400)
         save_data(DB_FILE, users)
@@ -332,25 +349,25 @@ def add_user(message):
             del notified[target_id]
             save_data(NOTIFIED_FILE, notified)
 
-        bot.reply_to(message, f"✅ Доступ для ID {target_id} выдан на {days} дней!")
+        bot.reply_to(message, f"✅ Доступ для ID `{target_id}` выдан на {days} дней!", parse_mode="Markdown")
         try:
-            bot.send_message(int(target_id), f"🎉 **Вам выдан доступ на {days} дн.!**\n\nНажмите /start, чтобы начать.")
-        except:
-            pass
-    except Exception:
-        bot.reply_to(message, "❌ Формат: /add ID ДНИ")
+            bot.send_message(int(target_id), f"🎉 **Вам выдан доступ на {days} дн.!**\n\nНажмите /start, чтобы начать.", parse_mode="Markdown")
+        except Exception as e:
+            print(f"Не удалось отправить ЛС юзеру {target_id}: {e}")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Формат: `/add ID ДНИ`\nДетали: {e}", parse_mode="Markdown")
 
 @bot.message_handler(commands=['del'])
 def del_user(message):
     if not is_owner(message.from_user.id):
         return
     try:
-        target_id = str(message.text.split()[1])
+        target_id = str(message.text.split()[1]).strip()
         users = load_data(DB_FILE)
         if target_id in users:
             del users[target_id]
             save_data(DB_FILE, users)
-            bot.reply_to(message, f"⛔ Доступ для ID {target_id} аннулирован.")
+            bot.reply_to(message, f"⛔ Доступ для ID `{target_id}` аннулирован.", parse_mode="Markdown")
         else:
             bot.reply_to(message, "Юзер не найден в базе.")
     except:
@@ -369,18 +386,18 @@ def list_users(message):
     for u_id, exp_time in list(users.items()):
         left_days = round((exp_time - now) / 86400, 1)
         if left_days > 0:
-            text += f"• ID: {u_id} — осталось {left_days} дн.\n"
+            text += f"• ID: `{u_id}` — осталось {left_days} дн.\n"
         else:
             del users[u_id]
             save_data(DB_FILE, users)
-    bot.reply_to(message, text)
+    bot.reply_to(message, text, parse_mode="Markdown")
 
 @bot.message_handler(commands=['uncd', 'uncooldown'])
 def reset_cooldown_command(message):
     if not is_owner(message.from_user.id):
         return
     try:
-        target_id = str(message.text.split()[1])
+        target_id = str(message.text.split()[1]).strip()
         reset_cooldown(target_id)
         bot.reply_to(message, f"⚡ Кулдаун для ID `{target_id}` успешно сброшен!", parse_mode="Markdown")
     except Exception:
@@ -400,7 +417,7 @@ def show_history(message):
         text += f"🕒 [{item['timestamp']}] {user_str}\n💬 {item['text'][:80]}...\n---\n"
     bot.reply_to(message, text)
 
-# ================= ЗАКРЫТИЕ ПОСТА ВРУЧНУЮ =================
+# --- ЗАКРЫТИЕ ПОСТА ВРУЧНУЮ ---
 
 @bot.message_handler(commands=['close'])
 def close_user_post(message):
@@ -458,7 +475,7 @@ def close_user_post(message):
         else:
             bot.reply_to(message, "❌ Пост не найден в списке активных.")
 
-# ================= ОБРАБОТКА CALLBACKS =================
+# --- ОБРАБОТКА CALLBACKS ---
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
@@ -525,7 +542,7 @@ def callback_handler(call):
                 reply_markup=get_back_keyboard()
             )
 
-# ================= ОБРАБОТКА СТАРТА =================
+# --- ОБРАБОТКА СТАРТА ---
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -544,7 +561,7 @@ def send_welcome(message):
             parse_mode="Markdown"
         )
 
-# ================= ОБРАБОТКА И ПУБЛИКАЦИЯ ПОСТОВ =================
+# --- ОБРАБОТКА И ПУБЛИКАЦИЯ ПОСТОВ ---
 
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'animation'])
 def handle_post(message):
@@ -640,14 +657,32 @@ def handle_post(message):
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка публикации: {e}")
 
-# Запуск фоновых процессов
-threading.Thread(target=auto_close_checker, daemon=True).start()
-threading.Thread(target=check_expiring_subscriptions, daemon=True).start()
+# --- КОРРЕКТНОЕ ГАШЕНИЕ ПРИ ОСТАНОВКЕ СЕРВЕРА ---
 
-while True:
-    try:
-        print("Бот запущен и готов к работе...")
-        bot.polling(none_stop=True, timeout=20, long_polling_timeout=20, skip_pending=True)
-    except Exception as e:
-        print(f"Ошибка сети: {e}. Переподключение...")
-        time.sleep(3)
+def shutdown_handler(signum, frame):
+    global is_running
+    print("Получен сигнал остановки. Завершаем работу бота...")
+    is_running = False
+    bot.stop_polling()
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, shutdown_handler)
+signal.signal(signal.SIGTERM, shutdown_handler)
+
+# --- ЗАПУСК ПОТОКОВ И ПОЛЛИНГА ---
+
+if __name__ == '__main__':
+    t1 = threading.Thread(target=auto_close_checker, daemon=True)
+    t2 = threading.Thread(target=check_expiring_subscriptions, daemon=True)
+    t1.start()
+    t2.start()
+
+    while is_running:
+        try:
+            print("Бот запущен и готов к работе...")
+            bot.polling(none_stop=True, timeout=10, long_polling_timeout=10, skip_pending=True)
+        except Exception as e:
+            if not is_running:
+                break
+            print(f"Ошибка сети: {e}. Переподключение через 3 сек...")
+            time.sleep(3)
