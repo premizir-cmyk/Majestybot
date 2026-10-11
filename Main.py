@@ -18,7 +18,7 @@ CHANNELS = [
 ]
 PRIMARY_CHANNEL_DISPLAY = CHANNELS[0]
 
-BOT_USERNAME = '@new_bot'  # Укажи юзернейм своего нового бота (например: @my_new_bot)
+BOT_USERNAME = '@Qbodiq_bot'  
 MY_USERNAME = '@premizir'  # Юзернейм для связи по поводу скрипта/бота
 
 # Владелец бота
