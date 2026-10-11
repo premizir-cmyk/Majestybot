@@ -12,18 +12,18 @@ from telebot import types
 # --- ОСНОВНЫЕ НАСТРОЙКИ ПОД НОВОГО БОТА ---
 TOKEN = '8660698360:AAEGVQen4KR8MXC3bJXZqDkAijZRZdttMfs'
 
-# Список каналов для публикаций (теперь 1 канал)
+# Список каналов для публикаций
 CHANNELS = [
     '-1003932211788'
 ]
 PRIMARY_CHANNEL_DISPLAY = CHANNELS[0]
 
-BOT_USERNAME = '@Qbodiq_bot'  
-MY_USERNAME = '@premizir'  # Юзернейм для связи по поводу скрипта/бота
+BOT_USERNAME = '@new_bot'  
+MY_USERNAME = '@premizir'  
 
 # Владелец бота
 OWNER_ID = [7605961809]
-MAIN_ADMIN_ID = OWNER_ID[0]  # Главный владелец (7605961809)
+MAIN_ADMIN_ID = OWNER_ID[0]
 
 bot = telebot.TeleBot(TOKEN, threaded=True, num_threads=16)
 
@@ -41,24 +41,25 @@ SCHEDULED_POSTS_FILE = os.path.join(DATA_DIR, 'scheduled_posts.json')
 BAN_FILE = os.path.join(DATA_DIR, 'blacklist.json')
 SLOT_COUNTER_FILE = os.path.join(DATA_DIR, 'slot_counter.json')
 SETTINGS_FILE = os.path.join(DATA_DIR, 'settings.json')
+NIGHT_MODE_FILE = os.path.join(DATA_DIR, 'night_mode.json')
 
-# ПРАВИЛА
+# ПРАВИЛА И НОВЫЕ ПАРАМЕТРЫ
 USER_COOLDOWN_TIME = 7200    # 2 часа кулдаун между постами одного юзера
-SLOT_STEP_MINUTES = 30       # Шаг сетки 30 минут
+SLOT_STEP_MINUTES = 15       # Шаг сетки 15 минут
 MAX_AHEAD_HOURS = 2          # Максимум 2 часа вперед для брони
+AUTO_CLOSE_TIME = 5400       # 1 час 30 минут (в секундах) для автозакрытия поста
 
 file_lock = threading.Lock()
 user_creation_data = {}  
 admin_action_data = {}     
-pending_reports = {}     
-active_published_slots = {}
 
 RULES_TEXT = """⚠️ **ПРАВИЛА ПУБЛИКАЦИИ:**
 
-1. **Шаг сетки:** 30 минут. Бронь доступна максимум на 2 часа вперёд.
-2. **Кулдаун платформы:** Если слот на платформе занят, следующий слот для неё блокируется с предложением выбрать время дальше.
-3. **Кулдаун пользователя:** Между своими постами необходимо выждать 2 часа.
-4. **Обязательна подписка** на наш канал.
+1. **Шаг сетки:** 15 минут. Бронь доступна максимум на 2 часа вперёд.
+2. **Ночной режим:** С 00:00 до 10:00 по МСК канал спит, публикация постов недоступна. Последнее время брони вечером — 23:45.
+3. **Кулдаун платформы:** Если слот на платформе занят, следующий слот для неё блокируется.
+4. **Кулдаун пользователя:** Между своими постами необходимо выждать 2 часа.
+5. **Обязательна подписка** на наш канал.
 
 🚨 *За нарушение правил доступ аннулируется без возврата средств!*"""
 
@@ -113,6 +114,11 @@ def is_banned(user_id):
 
 def is_owner(user_id):
     return user_id in OWNER_ID
+
+def is_night_time():
+    now = datetime.now(MSK)
+    # Ночь считается с 00:00 до 10:00 утра
+    return 0 <= now.hour < 10
 
 def check_channel_subscription(user_id):
     if is_owner(user_id):
@@ -225,7 +231,7 @@ def close_posts_in_channels(message_ids_dict):
             except Exception as e2:
                 print(f"[LOG] 🚨 Критическая ошибка закрытия в {ch_id}: {e2}", flush=True)
 
-# --- ГЕНЕРАЦИЯ СЛОТОВ ---
+# --- ГЕНЕРАЦИЯ СЛОТОВ (15 минут шаг, ограничение до 23:45) ---
 def get_available_slots_keyboard(user_id, platform_name):
     now = datetime.now(MSK)
     
@@ -256,7 +262,11 @@ def get_available_slots_keyboard(user_id, platform_name):
     slots_count = 0
     max_end_time = now + timedelta(hours=MAX_AHEAD_HOURS)
 
-    while slot_dt <= max_end_time and slots_count < 6:
+    while slot_dt <= max_end_time and slots_count < 8:
+        # Проверяем, чтобы время не выходило за рамки 23:45 (после 23:45 до 10:00 слоты не даем)
+        if slot_dt.hour == 0 or (slot_dt.hour == 23 and slot_dt.minute > 45) or (0 <= slot_dt.hour < 10):
+            break
+
         slot_str = slot_dt.strftime("%H:%M")
         timestamp_key = str(int(slot_dt.timestamp()))
         slot_timestamp = slot_dt.timestamp()
@@ -294,6 +304,11 @@ def get_available_slots_keyboard(user_id, platform_name):
 def scheduled_posts_checker():
     while True:
         try:
+            # Если сейчас ночное время (00:00 - 10:00), откладываем публикацию постов до утра (10:00)
+            if is_night_time():
+                time.sleep(30)
+                continue
+
             scheduled_data = load_data(SCHEDULED_POSTS_FILE)
             if isinstance(scheduled_data, dict) and scheduled_data:
                 now_ts = time.time()
@@ -313,15 +328,7 @@ def scheduled_posts_checker():
                             clean_bot_username = BOT_USERNAME.replace('@', '')
 
                             published_message_ids = {}
-                            
-                            if is_owner(user_id):
-                                target_channels = CHANNELS
-                            else:
-                                users_db = load_data(DB_FILE)
-                                target_channels = CHANNELS
-                                user_meta = users_db.get(str(user_id), {})
-                                if isinstance(user_meta, dict) and user_meta.get("channel") and user_meta.get("channel") != "all":
-                                    target_channels = [user_meta["channel"]]
+                            target_channels = CHANNELS
 
                             for ch_id in target_channels:
                                 published_msg = bot.send_message(ch_id, final_text)
@@ -363,7 +370,7 @@ def scheduled_posts_checker():
                                 "slot_num": f"СЛОТ-{slot_num}"
                             }
                             save_data(POSTS_FILE, posts_data)
-                            print(f"[LOG] Пост #{slot_num} опубликован и добавлен в active_posts.json для автозакрытия.", flush=True)
+                            print(f"[LOG] Пост #{slot_num} опубликован.", flush=True)
 
                         except Exception as e:
                             print(f"[LOG] Ошибка автоотправки: {e}", flush=True)
@@ -375,7 +382,7 @@ def scheduled_posts_checker():
         time.sleep(1)
 
 def auto_close_checker():
-    print("[LOG] 🔄 Поток автозакрытия постов запущен!", flush=True)
+    print("[LOG] 🔄 Поток автозакрытия постов запущен (интервал 1.5 часа)!", flush=True)
     while True:
         try:
             posts_data = load_data(POSTS_FILE)
@@ -384,10 +391,10 @@ def auto_close_checker():
                 changed = False
                 for p_key, p_info in list(posts_data.items()):
                     created_at = p_info.get("created_at", 0)
-                    if now - created_at >= 7200: # 2 часа
+                    if now - created_at >= AUTO_CLOSE_TIME: # 1 час 30 минут
                         msg_dict = p_info.get("message_ids", {})
                         if msg_dict:
-                            print(f"[LOG] Время вышло (2 часа) для поста {p_key}. Закрываем...", flush=True)
+                            print(f"[LOG] Время вышло (1.5 часа) для поста {p_key}. Закрываем...", flush=True)
                             close_posts_in_channels(msg_dict)
                         del posts_data[p_key]
                         changed = True
@@ -396,6 +403,41 @@ def auto_close_checker():
         except Exception as e:
             print(f"[LOG] Ошибка в фоновом цикле автозакрытия: {e}", flush=True)
         time.sleep(15)
+
+def night_mode_scheduler():
+    print("[LOG] 🌙 Поток ночного режима запущен!", flush=True)
+    last_sent_date = ""
+    while True:
+        try:
+            now = datetime.now(MSK)
+            current_date_str = now.strftime("%Y-%m-%d")
+            
+            # В 00:00 отправляем сообщение "уходим спать" (один раз в сутки)
+            if now.hour == 0 and now.minute == 0:
+                if last_sent_date != current_date_str + "_night":
+                    night_text = "💤 **Канал уходит спать до 10:00 утра.** Публикация постов приостановлена."
+                    for ch in CHANNELS:
+                        try:
+                            bot.send_message(ch, night_text, parse_mode="Markdown")
+                        except:
+                            pass
+                    last_sent_date = current_date_str + "_night"
+                    print("[LOG] 🌙 Отправлено сообщение о ночном режиме.", flush=True)
+
+            # В 10:00 отправляем сообщение "проснулись" (один раз в сутки)
+            elif now.hour == 10 and now.minute == 0:
+                if last_sent_date != current_date_str + "_morning":
+                    morning_text = "☀️ **Доброе утро! Канал проснулся и снова принимает брони!** 🚀"
+                    for ch in CHANNELS:
+                        try:
+                            bot.send_message(ch, morning_text, parse_mode="Markdown")
+                        except:
+                            pass
+                    last_sent_date = current_date_str + "_morning"
+                    print("[LOG] ☀️ Отправлено сообщение об утреннем открытии.", flush=True)
+        except Exception as e:
+            print(f"[LOG] Ошибка в потоке ночного режима: {e}", flush=True)
+        time.sleep(30)
 
 def backup_scheduler():
     while True:
@@ -818,6 +860,10 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, f"Ошибка отправки жалобы: {e}", show_alert=True)
 
     elif call.data == "start_create_post":
+        if is_night_time():
+            bot.answer_callback_query(call.id, "🌙 Ночной режим! Канал спит до 10:00 утра.", show_alert=True)
+            bot.send_message(call.message.chat.id, "💤 **Канал сейчас спит (с 00:00 до 10:00).** Выставление постов временно недоступно.", parse_mode="Markdown", reply_markup=get_persistent_keyboard())
+            return
         if not check_channel_subscription(user_id):
             bot.send_message(call.message.chat.id, "❌ Подпишитесь на все наши каналы!", reply_markup=get_persistent_keyboard())
             return
@@ -838,13 +884,16 @@ def callback_handler(call):
         )
 
     elif call.data == "confirm_publish":
+        if is_night_time():
+            bot.answer_callback_query(call.id, "🌙 Ночной режим! Канал спит.", show_alert=True)
+            return
         if user_id not in user_creation_data or 'final_text' not in user_creation_data[user_id]:
             bot.send_message(call.message.chat.id, "❌ Ошибка. Начните создание заново.")
             return
 
         platform_name = user_creation_data[user_id].get('platform', 'Задание')
         bot.edit_message_text(
-            "⏱ **Выберите время публикации по МСК (на ближайшие 2 часа, шаг 30 мин):**",
+            "⏱ **Выберите время публикации по МСК (шаг 15 минут):**",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=get_available_slots_keyboard(user_id, platform_name),
@@ -873,6 +922,9 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "⏳ Этот слот попадает под ваш персональный кулдаун (или уже имеющуюся бронь)!", show_alert=True)
 
     elif call.data.startswith("book_slot_"):
+        if is_night_time():
+            bot.answer_callback_query(call.id, "🌙 Ночной режим! Канал спит.", show_alert=True)
+            return
         timestamp_key = call.data.replace("book_slot_", "")
         if user_id not in user_creation_data or 'final_text' not in user_creation_data[user_id]:
             bot.edit_message_text("⚠️ Ошибка данных. Создайте пост заново.", chat_id=call.message.chat.id, message_id=call.message.message_id)
@@ -1172,6 +1224,11 @@ def text_handler(message):
     if message.text and message.text.startswith('/'): return
     
     if user_id in user_creation_data:
+        if is_night_time():
+            bot.reply_to(message, "🌙 Сейчас ночное время (с 00:00 до 10:00). Создание постов приостановлено.", reply_markup=get_persistent_keyboard())
+            del user_creation_data[user_id]
+            return
+
         step = user_creation_data[user_id].get('step', 1)
         text = message.text.strip() if message.text else ""
 
@@ -1214,11 +1271,12 @@ def text_handler(message):
 # --- ЗАПУСК ПОТОКОВ ---
 
 threading.Thread(target=auto_close_checker, daemon=True).start()
+threading.Thread(target=night_mode_scheduler, daemon=True).start()
 threading.Thread(target=backup_scheduler, daemon=True).start()
 threading.Thread(target=scheduled_posts_checker, daemon=True).start()
 
 if __name__ == '__main__':
-    print("🚀 Бот запущен и работает с новым каналом...", flush=True)
+    print("🚀 Бот запущен с ночным режимом, шагом 15 мин и автозакрытием 1.5 часа...", flush=True)
     while True:
         try:
             bot.polling(none_stop=True, timeout=30, long_polling_timeout=30, skip_pending=True)
