@@ -43,7 +43,7 @@ SLOT_COUNTER_FILE = os.path.join(DATA_DIR, 'slot_counter.json')
 SETTINGS_FILE = os.path.join(DATA_DIR, 'settings.json')
 NIGHT_MODE_FILE = os.path.join(DATA_DIR, 'night_mode.json')
 
-# ПРАВИЛА И НОВЫЕ ПАРАМЕТРЫ
+# ПРАВИЛА И ПАРАМЕТРЫ
 USER_COOLDOWN_TIME = 7200    # 2 часа кулдаун между постами одного юзера
 SLOT_STEP_MINUTES = 15       # Шаг сетки 15 минут
 MAX_AHEAD_HOURS = 2          # Максимум 2 часа вперед для брони
@@ -117,7 +117,6 @@ def is_owner(user_id):
 
 def is_night_time():
     now = datetime.now(MSK)
-    # Ночь считается с 00:00 до 10:00 утра
     return 0 <= now.hour < 10
 
 def check_channel_subscription(user_id):
@@ -231,7 +230,7 @@ def close_posts_in_channels(message_ids_dict):
             except Exception as e2:
                 print(f"[LOG] 🚨 Критическая ошибка закрытия в {ch_id}: {e2}", flush=True)
 
-# --- ГЕНЕРАЦИЯ СЛОТОВ (15 минут шаг, ограничение до 23:45) ---
+# --- ГЕНЕРАЦИЯ СЛОТОВ ---
 def get_available_slots_keyboard(user_id, platform_name):
     now = datetime.now(MSK)
     
@@ -263,7 +262,6 @@ def get_available_slots_keyboard(user_id, platform_name):
     max_end_time = now + timedelta(hours=MAX_AHEAD_HOURS)
 
     while slot_dt <= max_end_time and slots_count < 8:
-        # Проверяем, чтобы время не выходило за рамки 23:45 (после 23:45 до 10:00 слоты не даем)
         if slot_dt.hour == 0 or (slot_dt.hour == 23 and slot_dt.minute > 45) or (0 <= slot_dt.hour < 10):
             break
 
@@ -304,7 +302,6 @@ def get_available_slots_keyboard(user_id, platform_name):
 def scheduled_posts_checker():
     while True:
         try:
-            # Если сейчас ночное время (00:00 - 10:00), откладываем публикацию постов до утра (10:00)
             if is_night_time():
                 time.sleep(30)
                 continue
@@ -320,6 +317,7 @@ def scheduled_posts_checker():
                         slot_num = p_info['slot_num']
                         platform = p_info['platform']
                         payment = p_info['payment']
+                        target_channels = p_info.get('channels', CHANNELS)
 
                         try:
                             auto_msg = f"Здравствуйте! Я хочу у вас взять {platform} за {payment}руб!"
@@ -328,7 +326,6 @@ def scheduled_posts_checker():
                             clean_bot_username = BOT_USERNAME.replace('@', '')
 
                             published_message_ids = {}
-                            target_channels = CHANNELS
 
                             for ch_id in target_channels:
                                 published_msg = bot.send_message(ch_id, final_text)
@@ -412,7 +409,6 @@ def night_mode_scheduler():
             now = datetime.now(MSK)
             current_date_str = now.strftime("%Y-%m-%d")
             
-            # В 00:00 отправляем сообщение "уходим спать" (один раз в сутки)
             if now.hour == 0 and now.minute == 0:
                 if last_sent_date != current_date_str + "_night":
                     night_text = "💤 **Канал уходит спать до 10:00 утра.** Публикация постов приостановлена."
@@ -424,7 +420,6 @@ def night_mode_scheduler():
                     last_sent_date = current_date_str + "_night"
                     print("[LOG] 🌙 Отправлено сообщение о ночном режиме.", flush=True)
 
-            # В 10:00 отправляем сообщение "проснулись" (один раз в сутки)
             elif now.hour == 10 and now.minute == 0:
                 if last_sent_date != current_date_str + "_morning":
                     morning_text = "☀️ **Доброе утро! Канал проснулся и снова принимает брони!** 🚀"
@@ -786,11 +781,10 @@ def callback_handler(call):
     elif call.data.startswith("forcepost_ch_"):
         if not is_owner(user_id): return
         target_ch = call.data.replace("forcepost_ch_", "")
-        admin_action_data[user_id] = {'action': 'forcepost', 'channel': target_ch}
+        admin_action_data[user_id] = {'action': 'forcepost_step1', 'channel': target_ch}
         bot.edit_message_text(
             f"🚀 **Выбран канал:** `{target_ch}`\n\n"
-            "Введите параметры поста в формате:\n`ПЛАТФОРМА | СУММА | ОПИСАНИЕ`\n\n"
-            "Пример: `Авито | 200 | Написать отзыв`",
+            "📌 **Шаг 1 из 3:**\nВведите название платформы (например: *Авито*, *Яндекс Карты*):",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             parse_mode="Markdown"
@@ -899,6 +893,64 @@ def callback_handler(call):
             reply_markup=get_available_slots_keyboard(user_id, platform_name),
             parse_mode="Markdown"
         )
+
+    elif call.data == "confirm_force_publish":
+        if user_id not in user_creation_data or 'final_text' not in user_creation_data[user_id]:
+            bot.send_message(call.message.chat.id, "❌ Ошибка. Начните создание заново.")
+            return
+
+        c_data = user_creation_data[user_id]
+        final_text = c_data['final_text']
+        slot_num = c_data['slot_num']
+        platform = c_data['platform']
+        payment = c_data['payment']
+        target_ch = c_data['target_channel']
+
+        try:
+            auto_msg = f"Здравствуйте! Я хочу у вас взять {platform} за {payment}руб!"
+            encoded_text = urllib.parse.quote(auto_msg)
+            direct_url = f"https://t.me/{call.from_user.username}?text={encoded_text}" if call.from_user.username else f"tg://user?id={user_id}"
+            clean_bot_username = BOT_USERNAME.replace('@', '')
+
+            target_channels = CHANNELS if target_ch == "all" else [target_ch]
+            published_message_ids = {}
+
+            for ch_id in target_channels:
+                published_msg = bot.send_message(ch_id, final_text)
+                markup = types.InlineKeyboardMarkup(row_width=1)
+                markup.add(
+                    types.InlineKeyboardButton(text="Перейти к выполнению 💬", url=direct_url),
+                    types.InlineKeyboardButton(text="🚫 У меня спам-блок", url=f"https://t.me/{clean_bot_username}?start=spamblock_{user_id}"),
+                    types.InlineKeyboardButton(text="🚨 Пожаловаться", callback_data=f"complain_{user_id}")
+                )
+                bot.edit_message_reply_markup(chat_id=ch_id, message_id=published_msg.message_id, reply_markup=markup)
+                published_message_ids[str(ch_id)] = published_msg.message_id
+
+            posts_data = load_data(POSTS_FILE)
+            if not isinstance(posts_data, dict): posts_data = {}
+            posts_data[str(slot_num)] = {
+                "user_id": user_id,
+                "created_at": time.time(),
+                "message_ids": published_message_ids,
+                "platform": platform,
+                "payment": payment,
+                "slot_num": f"СЛОТ-{slot_num}"
+            }
+            save_data(POSTS_FILE, posts_data)
+
+            save_to_history(user_id, call.from_user.username, final_text)
+            bot.edit_message_text(
+                f"🚀 **Пост #{slot_num} успешно опубликован вне очереди!**",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=get_back_keyboard(),
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            bot.edit_message_text(f"❌ Ошибка публикации: {e}", chat_id=call.message.chat.id, message_id=call.message.message_id)
+
+        if user_id in user_creation_data:
+            del user_creation_data[user_id]
 
     elif call.data == "refresh_slots":
         bot.answer_callback_query(call.id, "🔄 Сетка обновлена!")
@@ -1163,67 +1215,54 @@ def text_handler(message):
             del admin_action_data[user_id]
             return
 
-        elif act_type == 'forcepost':
-            try:
-                content = message.text.strip()
-                parts = content.split('|')
-                if len(parts) < 3:
-                    bot.reply_to(message, "❌ Формат: `Платформа | Сумма | Описание`", parse_mode="Markdown")
-                    return
-                
-                platform = parts[0].strip()
-                payment = parts[1].strip()
-                desc = parts[2].strip()
-                slot_num = get_next_slot_id()
+        elif act_type == 'forcepost_step1':
+            text = message.text.strip() if message.text else ""
+            user_creation_data[user_id] = {'step': 1, 'platform': text, 'target_channel': target_ch, 'is_force': True}
+            admin_action_data[user_id]['action'] = 'forcepost_step2'
+            bot.reply_to(message, "💵 **Шаг 2 из 3:**\nВведите сумму оплаты в рублях (например: *150*):", parse_mode="Markdown")
+            return
 
-                final_text = (
-                    f"🔥ГОРЯЧИЙ СЛОТ #{slot_num}\n\n"
-                    f"❣️ Площадка: {platform}\n"
-                    f"💵 Оплата: {payment}\n"
-                    f"😀 Что нужно делать, От себя: {desc}"
-                )
+        elif act_type == 'forcepost_step2':
+            text = message.text.strip() if message.text else ""
+            user_creation_data[user_id]['payment'] = text
+            user_creation_data[user_id]['step'] = 3
+            admin_action_data[user_id]['action'] = 'forcepost_step3'
+            bot.reply_to(message, "😀 **Шаг 3 из 3:**\nВведите подробное описание задания:", parse_mode="Markdown")
+            return
 
-                auto_msg = f"Здравствуйте! Я хочу у вас взять {platform} за {payment}руб!"
-                encoded_text = urllib.parse.quote(auto_msg)
-                direct_url = f"https://t.me/{message.from_user.username}?text={encoded_text}" if message.from_user.username else f"tg://user?id={message.from_user.id}"
-                clean_bot_username = BOT_USERNAME.replace('@', '')
+        elif act_type == 'forcepost_step3':
+            text = message.text.strip() if message.text else ""
+            user_creation_data[user_id]['desc'] = text
+            slot_num = get_next_slot_id()
+            
+            c_data = user_creation_data[user_id]
+            platform = c_data['platform']
+            payment = c_data['payment']
+            desc = c_data['desc']
 
-                target_channels = CHANNELS if target_ch == "all" else [target_ch]
-                published_message_ids = {}
+            final_text = (
+                f"🔥ГОРЯЧИЙ СЛОТ #{slot_num}\n\n"
+                f"❣️ Площадка: {platform}\n"
+                f"💵 Оплата: {payment}\n"
+                f"😀 Что нужно делать, От себя: {desc}"
+            )
+            
+            user_creation_data[user_id]['final_text'] = final_text
+            user_creation_data[user_id]['slot_num'] = slot_num
 
-                for ch_id in target_channels:
-                    published_msg = bot.send_message(ch_id, final_text)
-                    markup = types.InlineKeyboardMarkup(row_width=1)
-                    markup.add(
-                        types.InlineKeyboardButton(text="Перейти к выполнению 💬", url=direct_url),
-                        types.InlineKeyboardButton(text="🚫 У меня спам-блок", url=f"https://t.me/{clean_bot_username}?start=spamblock_{message.from_user.id}"),
-                        types.InlineKeyboardButton(text="🚨 Пожаловаться", callback_data=f"complain_{message.from_user.id}")
-                    )
-                    bot.edit_message_reply_markup(chat_id=ch_id, message_id=published_msg.message_id, reply_markup=markup)
-                    published_message_ids[str(ch_id)] = published_msg.message_id
+            preview_markup = types.InlineKeyboardMarkup(row_width=1)
+            preview_markup.add(
+                types.InlineKeyboardButton(text="🚀 Опубликовать сейчас вне очереди", callback_data="confirm_force_publish"),
+                types.InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_publish")
+            )
 
-                posts_data = load_data(POSTS_FILE)
-                if not isinstance(posts_data, dict): posts_data = {}
-                posts_data[str(slot_num)] = {
-                    "user_id": message.from_user.id,
-                    "created_at": time.time(),
-                    "message_ids": published_message_ids,
-                    "platform": platform,
-                    "payment": payment,
-                    "slot_num": f"СЛОТ-{slot_num}"
-                }
-                save_data(POSTS_FILE, posts_data)
-
-                save_to_history(message.from_user.id, message.from_user.username, final_text)
-                bot.reply_to(message, f"🚀 Пост #{slot_num} успешно опубликован вне очереди!", parse_mode="Markdown")
-            except Exception as e:
-                bot.reply_to(message, f"❌ Ошибка публикации: {e}")
+            bot.reply_to(message, f"👁 **ПРЕДПРОСМОТР ПОСТА (ВНЕ ОЧЕРЕДИ):**\n\n{final_text}\n\nВсе верно?", reply_markup=preview_markup)
             del admin_action_data[user_id]
             return
 
     if message.text and message.text.startswith('/'): return
     
-    if user_id in user_creation_data:
+    if user_id in user_creation_data and not user_creation_data[user_id].get('is_force'):
         if is_night_time():
             bot.reply_to(message, "🌙 Сейчас ночное время (с 00:00 до 10:00). Создание постов приостановлено.", reply_markup=get_persistent_keyboard())
             del user_creation_data[user_id]
@@ -1276,7 +1315,7 @@ threading.Thread(target=backup_scheduler, daemon=True).start()
 threading.Thread(target=scheduled_posts_checker, daemon=True).start()
 
 if __name__ == '__main__':
-    print("🚀 Бот запущен с ночным режимом, шагом 15 мин и автозакрытием 1.5 часа...", flush=True)
+    print("🚀 Бот запущен с интерактивным внеочередным постом!", flush=True)
     while True:
         try:
             bot.polling(none_stop=True, timeout=30, long_polling_timeout=30, skip_pending=True)
