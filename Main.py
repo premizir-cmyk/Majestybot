@@ -9,7 +9,7 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 from telebot import types
 
-# --- ОСНОВНЫЕ НАСТРОЙКИ ПОД НОВОГО БОТА ---
+# --- ОСНОВНЫЕ НАСТРОЙКИ ПОД БОТА ---
 TOKEN = '8660698360:AAEGVQen4KR8MXC3bJXZqDkAijZRZdttMfs'
 
 # Список каналов для публикаций
@@ -208,6 +208,10 @@ def close_posts_in_channels(message_ids_dict):
         "⛔ *Набор на этот слот завершён.*\n\n"
         f"🤖 *Хотите такого же бота в свой канал? Пишите разработчику:* {MY_USERNAME}"
     )
+    
+    closed_markup = types.InlineKeyboardMarkup(row_width=1)
+    closed_markup.add(types.InlineKeyboardButton(text="📖 Обучение", url="https://t.me/qbodiqob"))
+
     for ch_id, msg_id in message_ids_dict.items():
         try:
             channel_id = int(ch_id)
@@ -218,14 +222,14 @@ def close_posts_in_channels(message_ids_dict):
                 chat_id=channel_id, 
                 message_id=message_id, 
                 parse_mode="Markdown", 
-                reply_markup=None
+                reply_markup=closed_markup
             )
             print(f"[LOG] ✅ Пост {message_id} в канале {channel_id} успешно закрыт.", flush=True)
         except Exception as e:
             print(f"[LOG] ❌ Не удалось отредактировать пост {msg_id} в {ch_id}: {e}", flush=True)
             try:
                 bot.delete_message(chat_id=int(ch_id), message_id=int(msg_id))
-                bot.send_message(chat_id=int(ch_id), text=CLOSED_CARD, parse_mode="Markdown")
+                bot.send_message(chat_id=int(ch_id), text=CLOSED_CARD, parse_mode="Markdown", reply_markup=closed_markup)
                 print(f"[LOG] ✅ Пост {msg_id} пересоздан как закрытый.", flush=True)
             except Exception as e2:
                 print(f"[LOG] 🚨 Критическая ошибка закрытия в {ch_id}: {e2}", flush=True)
@@ -717,16 +721,15 @@ def backup_cmd(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     user_id = call.from_user.id
-    try:
-        bot.answer_callback_query(call.id)
-    except:
-        pass
+    
+    # Не вызываем общий answer_callback_query здесь, чтобы кнопки с жалобой могли выдать свой alert
 
     if is_banned(user_id):
         return
 
     if call.data == "admin_grant_days":
         if not is_owner(user_id): return
+        bot.answer_callback_query(call.id)
         bot.edit_message_text(
             "🟢 **ВЫДАЧА ДОСТУПА (ПО ДНЯМ):**\nВыберите ТГК, на который вы хотите выдать доступ, или 'Все ТГК':",
             chat_id=call.message.chat.id,
@@ -737,6 +740,7 @@ def callback_handler(call):
 
     elif call.data == "admin_grant_posts":
         if not is_owner(user_id): return
+        bot.answer_callback_query(call.id)
         bot.edit_message_text(
             "📦 **ВЫДАЧА ПОСТОВ (ПО ШТУКАМ):**\nВыберите ТГК, на который вы хотите выдать посты, или 'Все ТГК':",
             chat_id=call.message.chat.id,
@@ -747,6 +751,7 @@ def callback_handler(call):
 
     elif call.data == "admin_force_post":
         if not is_owner(user_id): return
+        bot.answer_callback_query(call.id)
         bot.edit_message_text(
             "🚀 **ПУБЛИКАЦИЯ ПОСТА ВНЕ ОЧЕРЕДИ:**\nВыберите ТГК для публикации поста:",
             chat_id=call.message.chat.id,
@@ -757,6 +762,7 @@ def callback_handler(call):
 
     elif call.data.startswith("grantdays_ch_"):
         if not is_owner(user_id): return
+        bot.answer_callback_query(call.id)
         target_ch = call.data.replace("grantdays_ch_", "")
         admin_action_data[user_id] = {'action': 'grant_days_step1', 'channel': target_ch}
         bot.edit_message_text(
@@ -769,6 +775,7 @@ def callback_handler(call):
 
     elif call.data.startswith("grantposts_ch_"):
         if not is_owner(user_id): return
+        bot.answer_callback_query(call.id)
         target_ch = call.data.replace("grantposts_ch_", "")
         admin_action_data[user_id] = {'action': 'grant_posts_step1', 'channel': target_ch}
         bot.edit_message_text(
@@ -781,6 +788,7 @@ def callback_handler(call):
 
     elif call.data.startswith("forcepost_ch_"):
         if not is_owner(user_id): return
+        bot.answer_callback_query(call.id)
         target_ch = call.data.replace("forcepost_ch_", "")
         admin_action_data[user_id] = {'action': 'forcepost_step1', 'channel': target_ch}
         bot.edit_message_text(
@@ -792,6 +800,7 @@ def callback_handler(call):
         )
 
     elif call.data == "my_active_posts":
+        bot.answer_callback_query(call.id)
         posts_data = load_data(POSTS_FILE)
         my_posts = {}
         for p_key, p_info in posts_data.items():
@@ -842,6 +851,16 @@ def callback_handler(call):
     elif call.data.startswith("complain_"):
         author_id = call.data.replace("complain_", "")
         username = f"@{call.from_user.username}" if call.from_user.username else "нет юзернейма"
+        
+        try:
+            bot.answer_callback_query(
+                callback_query_id=call.id, 
+                text="Ваша жалоба оформлена, скоро вам напишет администратор с выяснением вопроса", 
+                show_alert=True
+            )
+        except Exception as e:
+            print(f"[LOG] Ошибка всплывающего окна жалобы: {e}", flush=True)
+
         try:
             complaint_text = (
                 f"🚨 **ЖАЛОБА НА ПОСТ/АВТОРА!**\n\n"
@@ -850,9 +869,8 @@ def callback_handler(call):
                 f"• Пост ID сообщения: `{call.message.message_id}`"
             )
             bot.send_message(MAIN_ADMIN_ID, complaint_text, parse_mode="Markdown")
-            bot.answer_callback_query(call.id, "Ваша жалоба оформлена, скоро вам напишет администратор с выяснением вопроса", show_alert=True)
         except Exception as e:
-            bot.answer_callback_query(call.id, f"Ошибка отправки жалобы: {e}", show_alert=True)
+            print(f"[LOG] Ошибка отправки жалобы админу: {e}", flush=True)
 
     elif call.data == "start_create_post":
         if is_night_time():
@@ -860,16 +878,20 @@ def callback_handler(call):
             bot.send_message(call.message.chat.id, "💤 **Канал сейчас спит (с 00:00 до 10:00).** Выставление постов временно недоступно.", parse_mode="Markdown", reply_markup=get_persistent_keyboard())
             return
         if not check_channel_subscription(user_id):
+            bot.answer_callback_query(call.id)
             bot.send_message(call.message.chat.id, "❌ Подпишитесь на все наши каналы!", reply_markup=get_persistent_keyboard())
             return
         if not is_user_active(user_id):
+            bot.answer_callback_query(call.id)
             bot.send_message(call.message.chat.id, f"⛔ У вас нет активного доступа. Ваш ID: `{user_id}`", parse_mode="Markdown")
             return
         cd = get_cooldown_left(user_id)
         if cd > 0:
+            bot.answer_callback_query(call.id)
             bot.send_message(call.message.chat.id, f"⏳ Кулдаун между постами: еще **{format_time(cd)}**.")
             return
 
+        bot.answer_callback_query(call.id)
         user_creation_data[user_id] = {'step': 1}
         bot.edit_message_text(
             "📌 **Шаг 1 из 3:**\nВведите название платформы (например: *Яндекс Карты*, *Авито* и т.д.):",
@@ -883,9 +905,11 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "🌙 Ночной режим! Канал спит.", show_alert=True)
             return
         if user_id not in user_creation_data or 'final_text' not in user_creation_data[user_id]:
+            bot.answer_callback_query(call.id)
             bot.send_message(call.message.chat.id, "❌ Ошибка. Начните создание заново.")
             return
 
+        bot.answer_callback_query(call.id)
         platform_name = user_creation_data[user_id].get('platform', 'Задание')
         bot.edit_message_text(
             "⏱ **Выберите время публикации по МСК (шаг 15 минут):**",
@@ -897,9 +921,11 @@ def callback_handler(call):
 
     elif call.data == "confirm_force_publish":
         if user_id not in user_creation_data or 'final_text' not in user_creation_data[user_id]:
+            bot.answer_callback_query(call.id)
             bot.send_message(call.message.chat.id, "❌ Ошибка. Начните создание заново.")
             return
 
+        bot.answer_callback_query(call.id)
         c_data = user_creation_data[user_id]
         final_text = c_data['final_text']
         slot_num = c_data['slot_num']
@@ -981,9 +1007,11 @@ def callback_handler(call):
             return
         timestamp_key = call.data.replace("book_slot_", "")
         if user_id not in user_creation_data or 'final_text' not in user_creation_data[user_id]:
+            bot.answer_callback_query(call.id)
             bot.edit_message_text("⚠️ Ошибка данных. Создайте пост заново.", chat_id=call.message.chat.id, message_id=call.message.message_id)
             return
 
+        bot.answer_callback_query(call.id)
         c_data = user_creation_data[user_id]
         scheduled_data = load_data(SCHEDULED_POSTS_FILE)
         
@@ -1007,6 +1035,7 @@ def callback_handler(call):
         )
 
     elif call.data == "my_scheduled_posts":
+        bot.answer_callback_query(call.id)
         scheduled_data = load_data(SCHEDULED_POSTS_FILE)
         user_bookings = {ts: info for ts, info in scheduled_data.items() if info.get("user_id") == user_id}
 
@@ -1041,10 +1070,12 @@ def callback_handler(call):
 
     elif call.data == "open_admin_panel":
         if not is_owner(user_id): return
+        bot.answer_callback_query(call.id)
         bot.edit_message_text(ADMIN_PANEL_TEXT, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_admin_panel_keyboard(), parse_mode="Markdown")
 
     elif call.data == "admin_manage_bookings":
         if not is_owner(user_id): return
+        bot.answer_callback_query(call.id)
         scheduled_data = load_data(SCHEDULED_POSTS_FILE)
         if not scheduled_data:
             bot.edit_message_text("📅 Активных броней в системе нет.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_admin_panel_keyboard(), parse_mode="Markdown")
@@ -1060,6 +1091,7 @@ def callback_handler(call):
         bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
 
     elif call.data == "cancel_publish":
+        bot.answer_callback_query(call.id)
         if user_id in user_creation_data: del user_creation_data[user_id]
         try:
             bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -1067,12 +1099,15 @@ def callback_handler(call):
             pass
 
     elif call.data == "main_menu":
+        bot.answer_callback_query(call.id)
         bot.edit_message_text("👋 Главное меню:", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_main_menu_keyboard(user_id))
 
     elif call.data == "show_rules":
+        bot.answer_callback_query(call.id)
         bot.edit_message_text(RULES_TEXT, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode="Markdown", reply_markup=get_back_keyboard())
 
     elif call.data == "my_profile":
+        bot.answer_callback_query(call.id)
         if is_owner(user_id):
             prof_text = "👑 У вас статус **Владельца**."
         elif is_user_active(user_id):
@@ -1094,6 +1129,7 @@ def callback_handler(call):
         bot.edit_message_text(prof_text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_back_keyboard(), parse_mode="Markdown")
 
     elif call.data == "report_scam":
+        bot.answer_callback_query(call.id)
         bot.edit_message_text(
             f"🚨 Если вы столкнулись со скамом или нарушением, напишите администратору: {MY_USERNAME}",
             chat_id=call.message.chat.id,
@@ -1317,7 +1353,7 @@ threading.Thread(target=backup_scheduler, daemon=True).start()
 threading.Thread(target=scheduled_posts_checker, daemon=True).start()
 
 if __name__ == '__main__':
-    print("🚀 Бот запущен с юзернеймом @Qbodiq_bot!", flush=True)
+    print("🚀 Бот полностью обновлен и запущен!", flush=True)
     while True:
         try:
             bot.polling(none_stop=True, timeout=30, long_polling_timeout=30, skip_pending=True)
