@@ -18,7 +18,7 @@ CHANNELS = [
 ]
 PRIMARY_CHANNEL_DISPLAY = CHANNELS[0]
 
-BOT_USERNAME = '@new_bot'  
+BOT_USERNAME = '@Qbodiq_bot'  
 MY_USERNAME = '@premizir'  
 
 # Владелец бота
@@ -332,6 +332,7 @@ def scheduled_posts_checker():
                                 markup = types.InlineKeyboardMarkup(row_width=1)
                                 markup.add(
                                     types.InlineKeyboardButton(text="Перейти к выполнению 💬", url=direct_url),
+                                    types.InlineKeyboardButton(text="📖 Обучение", url="https://t.me/qbodiqob"),
                                     types.InlineKeyboardButton(text="🚫 У меня спам-блок", url=f"https://t.me/{clean_bot_username}?start=spamblock_{user_id}"),
                                     types.InlineKeyboardButton(text="🚨 Пожаловаться", callback_data=f"complain_{user_id}")
                                 )
@@ -849,7 +850,7 @@ def callback_handler(call):
                 f"• Пост ID сообщения: `{call.message.message_id}`"
             )
             bot.send_message(MAIN_ADMIN_ID, complaint_text, parse_mode="Markdown")
-            bot.answer_callback_query(call.id, "Ваша жалоба успешно отправлена администратору!", show_alert=True)
+            bot.answer_callback_query(call.id, "Ваша жалоба оформлена, скоро вам напишет администратор с выяснением вопроса", show_alert=True)
         except Exception as e:
             bot.answer_callback_query(call.id, f"Ошибка отправки жалобы: {e}", show_alert=True)
 
@@ -920,6 +921,7 @@ def callback_handler(call):
                 markup = types.InlineKeyboardMarkup(row_width=1)
                 markup.add(
                     types.InlineKeyboardButton(text="Перейти к выполнению 💬", url=direct_url),
+                    types.InlineKeyboardButton(text="📖 Обучение", url="https://t.me/qbodiqob"),
                     types.InlineKeyboardButton(text="🚫 У меня спам-блок", url=f"https://t.me/{clean_bot_username}?start=spamblock_{user_id}"),
                     types.InlineKeyboardButton(text="🚨 Пожаловаться", callback_data=f"complain_{user_id}")
                 )
@@ -1315,7 +1317,7 @@ threading.Thread(target=backup_scheduler, daemon=True).start()
 threading.Thread(target=scheduled_posts_checker, daemon=True).start()
 
 if __name__ == '__main__':
-    print("🚀 Бот запущен с интерактивным внеочередным постом!", flush=True)
+    print("🚀 Бот запущен с юзернеймом @Qbodiq_bot!", flush=True)
     while True:
         try:
             bot.polling(none_stop=True, timeout=30, long_polling_timeout=30, skip_pending=True)
