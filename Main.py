@@ -205,7 +205,7 @@ def close_posts_in_channels(message_ids_dict):
     CLOSED_CARD = (
         "🔒 **[СЛОТ ЗАКРЫТ]**\n\n"
         "━━━━━⬍━━━━━\n"
-        "⛔ *Набор на этот слот завершён.*\n\n"
+        "⛔ **Это задание закончилось, включайте уведомления, чтобы не пропустить следующие!**\n\n"
         f"🤖 *Хотите такого же бота в свой канал? Пишите разработчику:* {MY_USERNAME}"
     )
     
@@ -721,8 +721,6 @@ def backup_cmd(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     user_id = call.from_user.id
-    
-    # Не вызываем общий answer_callback_query здесь, чтобы кнопки с жалобой могли выдать свой alert
 
     if is_banned(user_id):
         return
