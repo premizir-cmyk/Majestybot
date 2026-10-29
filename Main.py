@@ -1281,7 +1281,7 @@ def text_handler(message):
                 f"Платформа: {platform}\n\n"
                 f"Награда: {payment} ₽\n\n"
                 f"Описание: Задача легче, чем приготовить крабсбургер по секретному рецепту. Справится каждый!\n\n"
-                f"<blockquote>{desc}</blockquote>"
+                f"💬 <b>Суть задачи:</b> {desc}"
             )
             
             user_creation_data[user_id]['final_text'] = final_text
@@ -1331,7 +1331,7 @@ def text_handler(message):
                 f"Платформа: {platform}\n\n"
                 f"Награда: {payment} ₽\n\n"
                 f"Описание: Задача легче, чем приготовить крабсбургер по секретному рецепту. Справится каждый!\n\n"
-                f"<blockquote>{desc}</blockquote>"
+                f"💬 <b>Суть задачи:</b> {desc}"
             )
             
             user_creation_data[user_id]['final_text'] = final_text
