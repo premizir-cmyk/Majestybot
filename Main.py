@@ -203,10 +203,10 @@ def format_time(seconds):
 
 def close_posts_in_channels(message_ids_dict):
     CLOSED_CARD = (
-        "🔒 **Смена закрыта, повара!**\n\n"
+        "🔒 <b>Смена закрыта, повара!</b>\n\n"
         "━━━━━⬍━━━━━\n"
-        "🍍 **Следующий заказ уже на подходе — включи уведомления в канале, чтобы не пропустить новую смену и срубить баксов.**\n\n"
-        f"🤖 *Хотите такого же бота в свой канал? Пишите разработчику:* {MY_USERNAME}"
+        "🍍 <b>Следующий заказ уже на подходе — включи уведомления в канале, чтобы не пропустить новую смену и срубить баксов.</b>\n\n"
+        f"🤖 <i>Хотите такого же бота в свой канал? Пишите разработчику:</i> {MY_USERNAME}"
     )
     
     closed_markup = types.InlineKeyboardMarkup(row_width=1)
@@ -221,7 +221,7 @@ def close_posts_in_channels(message_ids_dict):
                 text=CLOSED_CARD, 
                 chat_id=channel_id, 
                 message_id=message_id, 
-                parse_mode="Markdown", 
+                parse_mode="HTML", 
                 reply_markup=closed_markup
             )
             print(f"[LOG] ✅ Смена {message_id} в канале {channel_id} успешно закрыта.", flush=True)
@@ -229,7 +229,7 @@ def close_posts_in_channels(message_ids_dict):
             print(f"[LOG] ❌ Не удалось отредактировать смену {msg_id} в {ch_id}: {e}", flush=True)
             try:
                 bot.delete_message(chat_id=int(ch_id), message_id=int(msg_id))
-                bot.send_message(chat_id=int(ch_id), text=CLOSED_CARD, parse_mode="Markdown", reply_markup=closed_markup)
+                bot.send_message(chat_id=int(ch_id), text=CLOSED_CARD, parse_mode="HTML", reply_markup=closed_markup)
                 print(f"[LOG] ✅ Смена {msg_id} пересоздана как закрытая.", flush=True)
             except Exception as e2:
                 print(f"[LOG] 🚨 Критическая ошибка закрытия в {ch_id}: {e2}", flush=True)
@@ -332,7 +332,7 @@ def scheduled_posts_checker():
                             published_message_ids = {}
 
                             for ch_id in target_channels:
-                                published_msg = bot.send_message(ch_id, final_text)
+                                published_msg = bot.send_message(ch_id, final_text, parse_mode="HTML")
                                 markup = types.InlineKeyboardMarkup(row_width=1)
                                 markup.add(
                                     types.InlineKeyboardButton(text="👨‍🍳 Взяться за приготовление", url=direct_url),
@@ -355,8 +355,8 @@ def scheduled_posts_checker():
 
                             confirm_msg = bot.send_message(
                                 user_id,
-                                f"🚀 **Ваша забронированная смена #{slot_num} успешно опубликована!**",
-                                parse_mode="Markdown",
+                                f"🚀 <b>Ваша забронированная смена #{slot_num} успешно опубликована!</b>",
+                                parse_mode="HTML",
                                 reply_markup=confirm_markup
                             )
 
@@ -416,10 +416,10 @@ def night_mode_scheduler():
             
             if now.hour == 0 and now.minute == 0:
                 if last_sent_date != current_date_str + "_night":
-                    night_text = "💤 **Бикини Боттон уходит спать до 10:00 утра.** Публикация смен приостановлена."
+                    night_text = "💤 <b>Бикини Боттон уходит спать до 10:00 утра.</b> Публикация смен приостановлена."
                     for ch in CHANNELS:
                         try:
-                            bot.send_message(ch, night_text, parse_mode="Markdown")
+                            bot.send_message(ch, night_text, parse_mode="HTML")
                         except:
                             pass
                     last_sent_date = current_date_str + "_night"
@@ -427,10 +427,10 @@ def night_mode_scheduler():
 
             elif now.hour == 10 and now.minute == 0:
                 if last_sent_date != current_date_str + "_morning":
-                    morning_text = "☀️ **Доброе утро, повара! Бикини Боттон проснулся и снова принимает брони!** 🚀"
+                    morning_text = "☀️ <b>Доброе утро, повара! Бикини Боттон проснулся и снова принимает брони!</b> 🚀"
                     for ch in CHANNELS:
                         try:
-                            bot.send_message(ch, morning_text, parse_mode="Markdown")
+                            bot.send_message(ch, morning_text, parse_mode="HTML")
                         except:
                             pass
                     last_sent_date = current_date_str + "_morning"
@@ -452,7 +452,7 @@ def backup_scheduler():
             for owner in OWNER_ID:
                 try:
                     with open(backup_filename, 'rb') as doc:
-                        bot.send_document(owner, doc, caption="📦 Авто-бэкап (раз в сутки)", parse_mode="Markdown")
+                        bot.send_document(owner, doc, caption="📦 Авто-бэкап (раз в сутки)", parse_mode="HTML")
                 except:
                     pass
             if os.path.exists(backup_filename):
@@ -518,7 +518,7 @@ def get_channels_selector_keyboard(prefix):
 @bot.message_handler(commands=['admin'])
 def admin_cmd(message):
     if not is_owner(message.from_user.id): return
-    bot.reply_to(message, ADMIN_PANEL_TEXT, parse_mode="Markdown", reply_markup=get_admin_panel_keyboard())
+    bot.reply_to(message, ADMIN_PANEL_TEXT, parse_mode="HTML", reply_markup=get_admin_panel_keyboard())
 
 @bot.message_handler(commands=['del'])
 def del_user(message):
@@ -529,9 +529,9 @@ def del_user(message):
         if target_id in users:
             del users[target_id]
             save_data(DB_FILE, users)
-            bot.reply_to(message, f"🗑 Доступ у сотрудника `{target_id}` успешно забран.", parse_mode="Markdown")
+            bot.reply_to(message, f"🗑 Доступ у сотрудника <code>{target_id}</code> успешно забран.", parse_mode="HTML")
         else:
-            bot.reply_to(message, f"⚠️ Сотрудник `{target_id}` не найден в базе.", parse_mode="Markdown")
+            bot.reply_to(message, f"⚠️ Сотрудник <code>{target_id}</code> не найден в базе.", parse_mode="HTML")
     except:
         bot.reply_to(message, "Формат: `/del ID`", parse_mode="Markdown")
 
@@ -544,7 +544,7 @@ def ban_user(message):
         if target_id not in b:
             b.append(target_id)
             save_data(BAN_FILE, b)
-        bot.reply_to(message, f"⛔ Пользователь `{target_id}` забанен.", parse_mode="Markdown")
+        bot.reply_to(message, f"⛔ Пользователь <code>{target_id}</code> забанен.", parse_mode="HTML")
     except:
         bot.reply_to(message, "Формат: `/ban ID`", parse_mode="Markdown")
 
@@ -557,7 +557,7 @@ def unban_user(message):
         if target_id in b:
             b.remove(target_id)
             save_data(BAN_FILE, b)
-        bot.reply_to(message, f"✅ Пользователь `{target_id}` разбанен.", parse_mode="Markdown")
+        bot.reply_to(message, f"✅ Пользователь <code>{target_id}</code> разбанен.", parse_mode="HTML")
     except:
         bot.reply_to(message, "Формат: `/unban ID`", parse_mode="Markdown")
 
@@ -581,9 +581,9 @@ def user_card(message):
                 exp_str = datetime.fromtimestamp(u_data, MSK).strftime('%d.%m.%Y %H:%M')
                 posts = 0
                 ch = "all"
-            bot.reply_to(message, f"👤 **Карточка сотрудника `{target_id}`:**\n• Бан: `{'Да' if is_b else 'Нет'}`\n• Канал: `{ch}`\n• Доступ до: `{exp_str}`\n• Остаток смен: `{posts}`", parse_mode="Markdown")
+            bot.reply_to(message, f"👤 <b>Карточка сотрудника <code>{target_id}</code>:</b>\n• Бан: <code>{'Да' if is_b else 'Нет'}</code>\n• Канал: <code>{ch}</code>\n• Доступ до: <code>{exp_str}</code>\n• Остаток смен: <code>{posts}</code>", parse_mode="HTML")
         else:
-            bot.reply_to(message, f"👤 Сотрудник `{target_id}` не найден в базе активных подписок. Бан: `{'Да' if is_b else 'Нет'}`", parse_mode="Markdown")
+            bot.reply_to(message, f"👤 Сотрудник <code>{target_id}</code> не найден в базе активных подписок. Бан: <code>{'Да' if is_b else 'Нет'}</code>", parse_mode="HTML")
     except:
         bot.reply_to(message, "Формат: `/user ID`", parse_mode="Markdown")
 
@@ -598,7 +598,7 @@ def list_users(message):
     now = time.time()
     active_users = {}
     expired_count = 0
-    text = "📋 **Список активных сотрудников в Бикини Боттон:**\n\n"
+    text = "📋 <b>Список активных сотрудников в Бикини Боттон:</b>\n\n"
     
     for uid, data in list(users.items()):
         if isinstance(data, dict):
@@ -607,26 +607,26 @@ def list_users(message):
             ch = data.get("channel", "all")
             if (exp > 0 and now < exp) or posts > 0:
                 exp_str = datetime.fromtimestamp(exp, MSK).strftime('%d.%m.%Y') if exp > 0 else "Бессрочно"
-                text += f"• `{uid}` ({ch}): До `{exp_str}`, смен: `{posts}`\n"
+                text += f"• <code>{uid}</code> ({ch}): До <code>{exp_str}</code>, смен: <code>{posts}</code>\n"
                 active_users[uid] = data
             else:
                 expired_count += 1
         else:
             if now < data:
                 exp_str = datetime.fromtimestamp(data, MSK).strftime('%d.%m.%Y')
-                text += f"• `{uid}`: До `{exp_str}`\n"
+                text += f"• <code>{uid}</code>: До <code>{exp_str}</code>\n"
                 active_users[uid] = data
             else:
                 expired_count += 1
 
     if expired_count > 0:
         save_data(DB_FILE, active_users)
-        text += f"\n🧹 *Автоматически удалено просроченных записей:* `{expired_count}`"
+        text += f"\n🧹 <i>Автоматически удалено просроченных записей:</i> <code>{expired_count}</code>"
 
     if len(active_users) == 0:
         bot.reply_to(message, "📋 Список активных подписок пуст (просроченные записи очищены).")
     else:
-        bot.reply_to(message, text, parse_mode="Markdown")
+        bot.reply_to(message, text, parse_mode="HTML")
 
 @bot.message_handler(commands=['stats'])
 def stats_cmd(message):
@@ -637,14 +637,14 @@ def stats_cmd(message):
     history = load_data(HISTORY_FILE)
     
     text = (
-        "📊 **Статистика Бикини Боттон Заработок:**\n\n"
-        f"• Подключенных каналов: `{len(CHANNELS)}`\n"
-        f"• Активных сотрудников в базе: `{len(users)}`\n"
-        f"• Заблокированных: `{len(banned)}`\n"
-        f"• Активных броней в сетке: `{len(sched)}`\n"
-        f"• Всего записей в истории: `{len(history)}`"
+        "📊 <b>Статистика Бикини Боттон Заработок:</b>\n\n"
+        f"• Подключенных каналов: <code>{len(CHANNELS)}</code>\n"
+        f"• Активных сотрудников в базе: <code>{len(users)}</code>\n"
+        f"• Заблокированных: <code>{len(banned)}</code>\n"
+        f"• Активных броней в сетке: <code>{len(sched)}</code>\n"
+        f"• Всего записей в истории: <code>{len(history)}</code>"
     )
-    bot.reply_to(message, text, parse_mode="Markdown")
+    bot.reply_to(message, text, parse_mode="HTML")
 
 @bot.message_handler(commands=['broadcast'])
 def broadcast_cmd(message):
@@ -659,12 +659,12 @@ def broadcast_cmd(message):
     fail = 0
     for uid in users:
         try:
-            bot.send_message(int(uid), f"📢 **Сообщение от Мистера Крабса:**\n\n{text_to_send}", parse_mode="Markdown")
+            bot.send_message(int(uid), f"📢 <b>Сообщение от Мистера Крабса:</b>\n\n{text_to_send}", parse_mode="HTML")
             success += 1
             time.sleep(0.1)
         except:
             fail += 1
-    bot.reply_to(message, f"📢 Рассылка завершена!\n✅ Успешно: `{success}`\n❌ Ошибок: `{fail}`", parse_mode="Markdown")
+    bot.reply_to(message, f"📢 Рассылка завершена!\n✅ Успешно: <code>{success}</code>\n❌ Ошибок: <code>{fail}</code>", parse_mode="HTML")
 
 @bot.message_handler(commands=['uncd'])
 def uncd_cmd(message):
@@ -675,9 +675,9 @@ def uncd_cmd(message):
         if target_id in cooldowns:
             del cooldowns[target_id]
             save_data(COOLDOWN_FILE, cooldowns)
-            bot.reply_to(message, f"⚡ Кулдаун для сотрудника `{target_id}` успешно сброшен!", parse_mode="Markdown")
+            bot.reply_to(message, f"⚡ Кулдаун для сотрудника <code>{target_id}</code> успешно сброшен!", parse_mode="HTML")
         else:
-            bot.reply_to(message, f"⚠️ У сотрудника `{target_id}` не было активного кулдауна.", parse_mode="Markdown")
+            bot.reply_to(message, f"⚠️ У сотрудника <code>{target_id}</code> не было активного кулдауна.", parse_mode="HTML")
     except:
         bot.reply_to(message, "Формат: `/uncd ID`", parse_mode="Markdown")
 
@@ -689,15 +689,15 @@ def history_cmd(message):
         bot.reply_to(message, "📜 История смен пуста.")
         return
     
-    bot.reply_to(message, "📜 **Последние опубликованные смены:**", parse_mode="Markdown")
+    bot.reply_to(message, "📜 <b>Последние опубликованные смены:</b>", parse_mode="HTML")
     for item in history[-5:]:
         full_text = (
-            f"▪️ **Время:** `{item['timestamp']}`\n"
-            f"▪️ **ID сотрудника:** `{item['user_id']}` ({item['username']})\n\n"
+            f"▪️ <b>Время:</b> <code>{item['timestamp']}</code>\n"
+            f"▪️ <b>ID сотрудника:</b> <code>{item['user_id']}</code> ({item['username']})\n\n"
             f"{item['text']}\n"
             "━━━━━━━━━━━━━━━━━━━"
         )
-        bot.send_message(message.chat.id, full_text, parse_mode="Markdown")
+        bot.send_message(message.chat.id, full_text, parse_mode="HTML")
 
 @bot.message_handler(commands=['backup'])
 def backup_cmd(message):
@@ -710,7 +710,7 @@ def backup_cmd(message):
                     if file.endswith('.json'):
                         zipf.write(os.path.join(root, file), arcname=file)
         with open(backup_filename, 'rb') as doc:
-            bot.send_document(message.chat.id, doc, caption="📦 Бэкап баз данных Бикини Боттон", parse_mode="Markdown")
+            bot.send_document(message.chat.id, doc, caption="📦 Бэкап баз данных Бикини Боттон", parse_mode="HTML")
         if os.path.exists(backup_filename):
             os.remove(backup_filename)
     except Exception as e:
@@ -729,33 +729,33 @@ def callback_handler(call):
         if not is_owner(user_id): return
         bot.answer_callback_query(call.id)
         bot.edit_message_text(
-            "🟢 **ВЫДАЧА ДОСТУПА (ПО ДНЯМ):**\nВыберите ТГК, на который вы хотите выдать доступ, или 'Все ТГК':",
+            "🟢 <b>ВЫДАЧА ДОСТУПА (ПО ДНЯМ):</b>\nВыберите ТГК, на который вы хотите выдать доступ, или 'Все ТГК':",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=get_channels_selector_keyboard("grantdays"),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
     elif call.data == "admin_grant_posts":
         if not is_owner(user_id): return
         bot.answer_callback_query(call.id)
         bot.edit_message_text(
-            "📦 **ВЫДАЧА СМЕН (ПО ШТУКАМ):**\nВыберите ТГК, на который вы хотите выдать смены, или 'Все ТГК':",
+            "📦 <b>ВЫДАЧА СМЕН (ПО ШТУКАМ):</b>\nВыберите ТГК, на который вы хотите выдать смены, или 'Все ТГК':",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=get_channels_selector_keyboard("grantposts"),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
     elif call.data == "admin_force_post":
         if not is_owner(user_id): return
         bot.answer_callback_query(call.id)
         bot.edit_message_text(
-            "🚀 **ПУБЛИКАЦИЯ СМЕНЫ ВНЕ ОЧЕРЕДИ:**\nВыберите ТГК для публикации:",
+            "🚀 <b>ПУБЛИКАЦИЯ СМЕНЫ ВНЕ ОЧЕРЕДИ:</b>\nВыберите ТГК для публикации:",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=get_channels_selector_keyboard("forcepost"),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
     elif call.data.startswith("grantdays_ch_"):
@@ -764,11 +764,11 @@ def callback_handler(call):
         target_ch = call.data.replace("grantdays_ch_", "")
         admin_action_data[user_id] = {'action': 'grant_days_step1', 'channel': target_ch}
         bot.edit_message_text(
-            f"🟢 **Выбран канал:** `{target_ch}`\n\n"
+            f"🟢 <b>Выбран канал:</b> <code>{target_ch}</code>\n\n"
             "Введите Telegram ID сотрудника:",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
     elif call.data.startswith("grantposts_ch_"):
@@ -777,11 +777,11 @@ def callback_handler(call):
         target_ch = call.data.replace("grantposts_ch_", "")
         admin_action_data[user_id] = {'action': 'grant_posts_step1', 'channel': target_ch}
         bot.edit_message_text(
-            f"📦 **Выбран канал:** `{target_ch}`\n\n"
+            f"📦 <b>Выбран канал:</b> <code>{target_ch}</code>\n\n"
             "Введите Telegram ID сотрудника:",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
     elif call.data.startswith("forcepost_ch_"):
@@ -790,11 +790,11 @@ def callback_handler(call):
         target_ch = call.data.replace("forcepost_ch_", "")
         admin_action_data[user_id] = {'action': 'forcepost_step1', 'channel': target_ch}
         bot.edit_message_text(
-            f"🚀 **Выбран канал:** `{target_ch}`\n\n"
-            "📌 **Шаг 1 из 3:**\nВведите название платформы (например: *Авито*, *Яндекс Карты*):",
+            f"🚀 <b>Выбран канал:</b> <code>{target_ch}</code>\n\n"
+            "📌 <b>Шаг 1 из 3:</b>\nВведите название платформы (например: <i>Авито</i>, <i>Яндекс Карты</i>):",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
     elif call.data == "my_active_posts":
@@ -807,24 +807,24 @@ def callback_handler(call):
 
         if not my_posts:
             bot.edit_message_text(
-                "❌ **У вас нет активных смен в каналах.**",
+                "❌ <b>У вас нет активных смен в каналах.</b>",
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
                 reply_markup=get_back_keyboard(),
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
             return
 
         markup = types.InlineKeyboardMarkup(row_width=1)
-        text = "📌 **Ваши активные смены в Бикини Боттон:**\n\nНажмите на кнопку ниже, чтобы досрочно закрыть нужную смену:\n\n"
+        text = "📌 <b>Ваши активные смены в Бикини Боттон:</b>\n\nНажмите на кнопку ниже, чтобы досрочно закрыть нужную смену:\n\n"
         for p_key, p_info in my_posts.items():
             slot_name = p_info.get("slot_num", f"СМЕНА #{p_key}")
             platform = p_info.get("platform", "Заказ")
-            text += f"• **{slot_name}** ({platform})\n"
+            text += f"• <b>{slot_name}</b> ({platform})\n"
             markup.add(types.InlineKeyboardButton(text=f"🔒 Закрыть {slot_name} ({platform})", callback_data=f"close_published_slot_{p_key}"))
         
         markup.add(types.InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="main_menu"))
-        bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+        bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="HTML")
 
     elif call.data.startswith("close_published_slot_"):
         slot_key = call.data.replace("close_published_slot_", "")
@@ -861,19 +861,19 @@ def callback_handler(call):
 
         try:
             complaint_text = (
-                f"🚨 **ЖАЛОБА НА СМЕНУ / СОТРУДНИКА!**\n\n"
-                f"• Жалующийся: {username} (ID: `{user_id}`)\n"
-                f"• Автор смены ID: `{author_id}`\n"
-                f"• Пост ID сообщения: `{call.message.message_id}`"
+                f"🚨 <b>ЖАЛОБА НА СМЕНУ / СОТРУДНИКА!</b>\n\n"
+                f"• Жалующийся: {username} (ID: <code>{user_id}</code>)\n"
+                f"• Автор смены ID: <code>{author_id}</code>\n"
+                f"• Пост ID сообщения: <code>{call.message.message_id}</code>"
             )
-            bot.send_message(MAIN_ADMIN_ID, complaint_text, parse_mode="Markdown")
+            bot.send_message(MAIN_ADMIN_ID, complaint_text, parse_mode="HTML")
         except Exception as e:
             print(f"[LOG] Ошибка отправки жалобы админу: {e}", flush=True)
 
     elif call.data == "start_create_post":
         if is_night_time():
             bot.answer_callback_query(call.id, "🌙 Ночной режим! Бикини Боттон спит до 10:00 утра.", show_alert=True)
-            bot.send_message(call.message.chat.id, "💤 **Бикини Боттон сейчас спит (с 00:00 до 10:00).** Выход на смены временно недоступен.", parse_mode="Markdown", reply_markup=get_persistent_keyboard())
+            bot.send_message(call.message.chat.id, "💤 <b>Бикини Боттон сейчас спит (с 00:00 до 10:00).</b> Выход на смены временно недоступен.", parse_mode="HTML", reply_markup=get_persistent_keyboard())
             return
         if not check_channel_subscription(user_id):
             bot.answer_callback_query(call.id)
@@ -881,21 +881,21 @@ def callback_handler(call):
             return
         if not is_user_active(user_id):
             bot.answer_callback_query(call.id)
-            bot.send_message(call.message.chat.id, f"⛔ У вас нет активного доступа. Ваш ID: `{user_id}`", parse_mode="Markdown")
+            bot.send_message(call.message.chat.id, f"⛔ У вас нет активного доступа. Ваш ID: <code>{user_id}</code>", parse_mode="HTML")
             return
         cd = get_cooldown_left(user_id)
         if cd > 0:
             bot.answer_callback_query(call.id)
-            bot.send_message(call.message.chat.id, f"⏳ Кулдаун между сменами: еще **{format_time(cd)}**.")
+            bot.send_message(call.message.chat.id, f"⏳ Кулдаун между сменами: еще <b>{format_time(cd)}</b>.")
             return
 
         bot.answer_callback_query(call.id)
         user_creation_data[user_id] = {'step': 1}
         bot.edit_message_text(
-            "📌 **Шаг 1 из 3:**\nВведите название платформы (например: *Яндекс Карты*, *Авито* и т.д.):",
+            "📌 <b>Шаг 1 из 3:</b>\nВведите название платформы (например: <i>Яндекс Карты</i>, <i>Авито</i> и т.д.):",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
     elif call.data == "confirm_publish":
@@ -910,11 +910,11 @@ def callback_handler(call):
         bot.answer_callback_query(call.id)
         platform_name = user_creation_data[user_id].get('platform', 'Заказ')
         bot.edit_message_text(
-            "⏱ **Выберите время смены по МСК (шаг 15 минут):**",
+            "⏱ <b>Выберите время смены по МСК (шаг 15 минут):</b>",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=get_available_slots_keyboard(user_id, platform_name),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
     elif call.data == "confirm_force_publish":
@@ -941,7 +941,7 @@ def callback_handler(call):
             published_message_ids = {}
 
             for ch_id in target_channels:
-                published_msg = bot.send_message(ch_id, final_text)
+                published_msg = bot.send_message(ch_id, final_text, parse_mode="HTML")
                 markup = types.InlineKeyboardMarkup(row_width=1)
                 markup.add(
                     types.InlineKeyboardButton(text="👨‍🍳 Взяться за приготовление", url=direct_url),
@@ -966,11 +966,11 @@ def callback_handler(call):
 
             save_to_history(user_id, call.from_user.username, final_text)
             bot.edit_message_text(
-                f"🚀 **Смена #{slot_num} успешно опубликована вне очереди!**",
+                f"🚀 <b>Смена #{slot_num} успешно опубликована вне очереди!</b>",
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
                 reply_markup=get_back_keyboard(),
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
         except Exception as e:
             bot.edit_message_text(f"❌ Ошибка публикации: {e}", chat_id=call.message.chat.id, message_id=call.message.message_id)
@@ -1025,11 +1025,11 @@ def callback_handler(call):
 
         dt_formatted = datetime.fromtimestamp(float(timestamp_key), MSK).strftime('%H:%M МСК')
         bot.edit_message_text(
-            f"✅ **Смена успешно забронирована на {dt_formatted}!**\nБот опубликует её автоматически на кухне в назначенное время.",
+            f"✅ <b>Смена успешно забронирована на {dt_formatted}!</b>\nБот опубликует её автоматически на кухне в назначенное время.",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=get_back_keyboard(),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
     elif call.data == "my_scheduled_posts":
@@ -1038,17 +1038,17 @@ def callback_handler(call):
         user_bookings = {ts: info for ts, info in scheduled_data.items() if info.get("user_id") == user_id}
 
         if not user_bookings:
-            bot.edit_message_text("📅 **У вас нет активных броней смен.**", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_back_keyboard(), parse_mode="Markdown")
+            bot.edit_message_text("📅 <b>У вас нет активных броней смен.</b>", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_back_keyboard(), parse_mode="HTML")
             return
 
         markup = types.InlineKeyboardMarkup(row_width=1)
-        text = "📅 **Ваши активные брони смен:**\n\n"
+        text = "📅 <b>Ваши активные брони смен:</b>\n\n"
         for ts, info in sorted(user_bookings.items(), key=lambda x: float(x[0])):
             dt_str = datetime.fromtimestamp(float(ts), MSK).strftime('%d.%m в %H:%M МСК')
-            text += f"• Смена #{info['slot_num']} на `{dt_str}` ({info['platform']})\n"
+            text += f"• Смена #{info['slot_num']} на <code>{dt_str}</code> ({info['platform']})\n"
             markup.add(types.InlineKeyboardButton(text=f"❌ Отменить бронь #{info['slot_num']}", callback_data=f"cancel_booking_{ts}"))
         markup.add(types.InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="main_menu"))
-        bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+        bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="HTML")
 
     elif call.data.startswith("cancel_booking_"):
         bot.answer_callback_query(call.id, "Бронь смены отменена!")
@@ -1069,24 +1069,24 @@ def callback_handler(call):
     elif call.data == "open_admin_panel":
         if not is_owner(user_id): return
         bot.answer_callback_query(call.id)
-        bot.edit_message_text(ADMIN_PANEL_TEXT, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_admin_panel_keyboard(), parse_mode="Markdown")
+        bot.edit_message_text(ADMIN_PANEL_TEXT, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_admin_panel_keyboard(), parse_mode="HTML")
 
     elif call.data == "admin_manage_bookings":
         if not is_owner(user_id): return
         bot.answer_callback_query(call.id)
         scheduled_data = load_data(SCHEDULED_POSTS_FILE)
         if not scheduled_data:
-            bot.edit_message_text("📅 Активных броней смен в системе нет.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_admin_panel_keyboard(), parse_mode="Markdown")
+            bot.edit_message_text("📅 Активных броней смен в системе нет.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_admin_panel_keyboard(), parse_mode="HTML")
             return
 
         markup = types.InlineKeyboardMarkup(row_width=1)
-        text = "📅 **Все активные брони смен:**\n\n"
+        text = "📅 <b>Все активные брони смен:</b>\n\n"
         for ts, info in sorted(scheduled_data.items(), key=lambda x: float(x[0])):
             dt_str = datetime.fromtimestamp(float(ts), MSK).strftime('%d.%m в %H:%M МСК')
-            text += f"• Бронь #{info['slot_num']} на `{dt_str}` ({info['platform']})\n"
+            text += f"• Бронь #{info['slot_num']} на <code>{dt_str}</code> ({info['platform']})\n"
             markup.add(types.InlineKeyboardButton(text=f"❌ Снять бронь #{info['slot_num']} ({dt_str})", callback_data=f"cancel_booking_{ts}"))
         markup.add(types.InlineKeyboardButton(text="⬅️ Назад в админ-панель", callback_data="open_admin_panel"))
-        bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+        bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="HTML")
 
     elif call.data == "cancel_publish":
         bot.answer_callback_query(call.id)
@@ -1102,12 +1102,12 @@ def callback_handler(call):
 
     elif call.data == "show_rules":
         bot.answer_callback_query(call.id)
-        bot.edit_message_text(RULES_TEXT, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode="Markdown", reply_markup=get_back_keyboard())
+        bot.edit_message_text(RULES_TEXT, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode="HTML", reply_markup=get_back_keyboard())
 
     elif call.data == "my_profile":
         bot.answer_callback_query(call.id)
         if is_owner(user_id):
-            prof_text = "👑 У вас статус **Владельца Бикини Боттон**."
+            prof_text = "👑 У вас статус <b>Владельца Бикини Боттон</b>."
         elif is_user_active(user_id):
             cd = get_cooldown_left(user_id)
             cd_str = format_time(cd) if cd > 0 else "Отсутствует"
@@ -1117,14 +1117,14 @@ def callback_handler(call):
             exp = u_info.get('expire', 0) if isinstance(u_info, dict) else 0
             exp_str = datetime.fromtimestamp(exp, MSK).strftime('%d.%m.%Y') if exp > 0 else "Бессрочно"
             prof_text = (
-                f"👤 **Ваш профиль повара:**\n"
-                f"• Кулдаун между сменами: **{cd_str}**\n"
-                f"• Доступ до: **{exp_str}**\n"
-                f"• Доступно смен: **{posts_cnt}**"
+                f"👤 <b>Ваш профиль повара:</b>\n"
+                f"• Кулдаун между сменами: <b>{cd_str}</b>\n"
+                f"• Доступ до: <b>{exp_str}</b>\n"
+                f"• Доступно смен: <b>{posts_cnt}</b>"
             )
         else:
             prof_text = "⛔ У вас нет активного доступа к сменам."
-        bot.edit_message_text(prof_text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_back_keyboard(), parse_mode="Markdown")
+        bot.edit_message_text(prof_text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_back_keyboard(), parse_mode="HTML")
 
     elif call.data == "report_scam":
         bot.answer_callback_query(call.id)
@@ -1133,7 +1133,7 @@ def callback_handler(call):
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=get_back_keyboard(),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
 # --- ТЕКСТОВЫЕ ВВОДЫ И КОМАНДЫ ---
@@ -1159,14 +1159,14 @@ def start_cmd(message):
         author_id_str = command_args[1].replace("spamblock_", "")
         try:
             author_id = int(author_id_str)
-            user_mention = f"@{message.from_user.username}" if message.from_user.username else f"ID: `{user_id}`"
+            user_mention = f"@{message.from_user.username}" if message.from_user.username else f"ID: <code>{user_id}</code>"
             
             spam_notification = (
-                f"⚠️ **У сотрудника спам-блок!**\n\n"
-                f"• Повар: {user_mention} (ID: `{user_id}`)\n"
+                f"⚠️ <b>У сотрудника спам-блок!</b>\n\n"
+                f"• Повар: {user_mention} (ID: <code>{user_id}</code>)\n"
                 f"Хочет взять вашу смену, но у него не отправляется ЛС из-за спам-блока. Напишите ему первыми!"
             )
-            bot.send_message(author_id, spam_notification, parse_mode="Markdown")
+            bot.send_message(author_id, spam_notification, parse_mode="HTML")
             bot.reply_to(message, "✅ Уведомление отправлено автору смены! Скоро он напишет вам сам.", reply_markup=get_persistent_keyboard())
         except Exception as e:
             bot.reply_to(message, "❌ Не удалось отправить уведомление автору.", reply_markup=get_persistent_keyboard())
@@ -1192,7 +1192,7 @@ def text_handler(message):
                 return
             admin_action_data[user_id]['target_id'] = target_id
             admin_action_data[user_id]['action'] = 'grant_days_step2'
-            bot.reply_to(message, f"🟢 ID сотрудника `{target_id}` записан.\n\nНа сколько дней выдать доступ? (введите число, например: `30`)", parse_mode="Markdown")
+            bot.reply_to(message, f"🟢 ID сотрудника <code>{target_id}</code> записан.\n\nНа сколько дней выдать доступ? (введите число, например: <code>30</code>)", parse_mode="HTML")
             return
 
         elif act_type == 'grant_days_step2':
@@ -1210,9 +1210,9 @@ def text_handler(message):
             save_data(DB_FILE, users)
 
             ch_label = "Все ТГК" if target_ch == "all" else f"ТГК {target_ch}"
-            bot.reply_to(message, f"✅ Доступ для сотрудника `{target_id}` успешно выдан на {days} дней в {ch_label}!", parse_mode="Markdown")
+            bot.reply_to(message, f"✅ Доступ для сотрудника <code>{target_id}</code> успешно выдан на {days} дней в {ch_label}!", parse_mode="HTML")
             try:
-                bot.send_message(int(target_id), f"🎉 **Вам выдан доступ к сменам на {days} дней!** Нажмите /start", reply_markup=get_persistent_keyboard())
+                bot.send_message(int(target_id), f"🎉 <b>Вам выдан доступ к сменам на {days} дней!</b> Нажмите /start", parse_mode="HTML", reply_markup=get_persistent_keyboard())
             except:
                 pass
             del admin_action_data[user_id]
@@ -1225,7 +1225,7 @@ def text_handler(message):
                 return
             admin_action_data[user_id]['target_id'] = target_id
             admin_action_data[user_id]['action'] = 'grant_posts_step2'
-            bot.reply_to(message, f"📦 ID сотрудника `{target_id}` записан.\n\nСколько смен выдать? (введите число, например: `4`)", parse_mode="Markdown")
+            bot.reply_to(message, f"📦 ID сотрудника <code>{target_id}</code> записан.\n\nСколько смен выдать? (введите число, например: <code>4</code>)", parse_mode="HTML")
             return
 
         elif act_type == 'grant_posts_step2':
@@ -1243,9 +1243,9 @@ def text_handler(message):
             save_data(DB_FILE, users)
 
             ch_label = "Все ТГК" if target_ch == "all" else f"ТГК {target_ch}"
-            bot.reply_to(message, f"✅ Сотруднику `{target_id}` успешно начислено +{posts} смен в {ch_label}! Всего доступно: {curr_posts + posts}", parse_mode="Markdown")
+            bot.reply_to(message, f"✅ Сотруднику <code>{target_id}</code> успешно начислено +{posts} смен в {ch_label}! Всего доступно: {curr_posts + posts}", parse_mode="HTML")
             try:
-                bot.send_message(int(target_id), f"🎉 **Вам начислено {posts} смен для работы!** Нажмите /start", reply_markup=get_persistent_keyboard())
+                bot.send_message(int(target_id), f"🎉 <b>Вам начислено {posts} смен для работы!</b> Нажмите /start", parse_mode="HTML", reply_markup=get_persistent_keyboard())
             except:
                 pass
             del admin_action_data[user_id]
@@ -1255,7 +1255,7 @@ def text_handler(message):
             text = message.text.strip() if message.text else ""
             user_creation_data[user_id] = {'step': 1, 'platform': text, 'target_channel': target_ch, 'is_force': True}
             admin_action_data[user_id]['action'] = 'forcepost_step2'
-            bot.reply_to(message, "💵 **Шаг 2 из 3:**\nВведите сумму оплаты в рублях (например: *150*):", parse_mode="Markdown")
+            bot.reply_to(message, "💵 <b>Шаг 2 из 3:</b>\nВведите сумму оплаты в рублях (например: <i>150</i>):", parse_mode="HTML")
             return
 
         elif act_type == 'forcepost_step2':
@@ -1263,7 +1263,7 @@ def text_handler(message):
             user_creation_data[user_id]['payment'] = text
             user_creation_data[user_id]['step'] = 3
             admin_action_data[user_id]['action'] = 'forcepost_step3'
-            bot.reply_to(message, "📝 **Шаг 3 из 3:**\nВведите подробное описание смены:", parse_mode="Markdown")
+            bot.reply_to(message, "📝 <b>Шаг 3 из 3:</b>\nВведите подробное описание смены:", parse_mode="HTML")
             return
 
         elif act_type == 'forcepost_step3':
@@ -1281,7 +1281,7 @@ def text_handler(message):
                 f"Платформа: {platform}\n\n"
                 f"Награда: {payment} ₽\n\n"
                 f"Описание: Задача легче, чем приготовить крабсбургер по секретному рецепту. Справится каждый!\n\n"
-                f"┃ {desc}"
+                f"<blockquote>{desc}</blockquote>"
             )
             
             user_creation_data[user_id]['final_text'] = final_text
@@ -1293,7 +1293,7 @@ def text_handler(message):
                 types.InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_publish")
             )
 
-            bot.reply_to(message, f"👁 **ПРЕДПРОСМОТР СМЕНЫ (ВНЕ ОЧЕРЕДИ):**\n\n{final_text}\n\nВсе верно?", reply_markup=preview_markup)
+            bot.reply_to(message, f"👁 <b>ПРЕДПРОСМОТР СМЕНЫ (ВНЕ ОЧЕРЕДИ):</b>\n\n{final_text}\n\nВсе верно?", parse_mode="HTML", reply_markup=preview_markup)
             del admin_action_data[user_id]
             return
 
@@ -1311,12 +1311,12 @@ def text_handler(message):
         if step == 1:
             user_creation_data[user_id]['platform'] = text
             user_creation_data[user_id]['step'] = 2
-            bot.reply_to(message, "💵 **Шаг 2 из 3:**\nВведите сумму оплаты в рублях (например: *150*):", parse_mode="Markdown")
+            bot.reply_to(message, "💵 <b>Шаг 2 из 3:</b>\nВведите сумму оплаты в рублях (например: <i>150</i>):", parse_mode="HTML")
 
         elif step == 2:
             user_creation_data[user_id]['payment'] = text
             user_creation_data[user_id]['step'] = 3
-            bot.reply_to(message, "📝 **Шаг 3 из 3:**\nВведите подробное описание смены:", parse_mode="Markdown")
+            bot.reply_to(message, "📝 <b>Шаг 3 из 3:</b>\nВведите подробное описание смены:", parse_mode="HTML")
 
         elif step == 3:
             user_creation_data[user_id]['desc'] = text
@@ -1331,7 +1331,7 @@ def text_handler(message):
                 f"Платформа: {platform}\n\n"
                 f"Награда: {payment} ₽\n\n"
                 f"Описание: Задача легче, чем приготовить крабсбургер по секретному рецепту. Справится каждый!\n\n"
-                f"┃ {desc}"
+                f"<blockquote>{desc}</blockquote>"
             )
             
             user_creation_data[user_id]['final_text'] = final_text
@@ -1343,7 +1343,7 @@ def text_handler(message):
                 types.InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_publish")
             )
 
-            bot.reply_to(message, f"👁 **ПРЕДПРОСМОТР СМЕНЫ:**\n\n{final_text}\n\nВсе верно?", reply_markup=preview_markup)
+            bot.reply_to(message, f"👁 <b>ПРЕДПРОСМОТР СМЕНЫ:</b>\n\n{final_text}\n\nВсе верно?", parse_mode="HTML", reply_markup=preview_markup)
 
 # --- ЗАПУСК ПОТОКОВ ---
 
