@@ -210,7 +210,7 @@ def close_posts_in_channels(message_ids_dict):
     )
     
     closed_markup = types.InlineKeyboardMarkup(row_width=1)
-    closed_markup.add(types.InlineKeyboardButton(text="📖 Обучение", url="https://t.me/qbodiqob"))
+    closed_markup.add(types.InlineKeyboardButton(text="📜 Рецепт крабсбургера (обучение)", url="https://t.me/qbodiqob"))
 
     for ch_id, msg_id in message_ids_dict.items():
         try:
@@ -335,10 +335,10 @@ def scheduled_posts_checker():
                                 published_msg = bot.send_message(ch_id, final_text)
                                 markup = types.InlineKeyboardMarkup(row_width=1)
                                 markup.add(
-                                    types.InlineKeyboardButton(text="Выйти на смену 💬", url=direct_url),
-                                    types.InlineKeyboardButton(text="📖 Обучение", url="https://t.me/qbodiqob"),
+                                    types.InlineKeyboardButton(text="👨‍🍳 Взяться за приготовление", url=direct_url),
+                                    types.InlineKeyboardButton(text="📜 Рецепт крабсбургера (обучение)", url="https://t.me/qbodiqob"),
                                     types.InlineKeyboardButton(text="🚫 У меня спам-блок", url=f"https://t.me/{clean_bot_username}?start=spamblock_{user_id}"),
-                                    types.InlineKeyboardButton(text="🚨 Пожаловаться", callback_data=f"complain_{user_id}")
+                                    types.InlineKeyboardButton(text="🍔 Пожаловаться на невкусный крабсбургер", callback_data=f"complain_{user_id}")
                                 )
                                 bot.edit_message_reply_markup(chat_id=ch_id, message_id=published_msg.message_id, reply_markup=markup)
                                 published_message_ids[str(ch_id)] = published_msg.message_id
@@ -944,10 +944,10 @@ def callback_handler(call):
                 published_msg = bot.send_message(ch_id, final_text)
                 markup = types.InlineKeyboardMarkup(row_width=1)
                 markup.add(
-                    types.InlineKeyboardButton(text="Выйти на смену 💬", url=direct_url),
-                    types.InlineKeyboardButton(text="📖 Обучение", url="https://t.me/qbodiqob"),
+                    types.InlineKeyboardButton(text="👨‍🍳 Взяться за приготовление", url=direct_url),
+                    types.InlineKeyboardButton(text="📜 Рецепт крабсбургера (обучение)", url="https://t.me/qbodiqob"),
                     types.InlineKeyboardButton(text="🚫 У меня спам-блок", url=f"https://t.me/{clean_bot_username}?start=spamblock_{user_id}"),
-                    types.InlineKeyboardButton(text="🚨 Пожаловаться", callback_data=f"complain_{user_id}")
+                    types.InlineKeyboardButton(text="🍔 Пожаловаться на невкусный крабсбургер", callback_data=f"complain_{user_id}")
                 )
                 bot.edit_message_reply_markup(chat_id=ch_id, message_id=published_msg.message_id, reply_markup=markup)
                 published_message_ids[str(ch_id)] = published_msg.message_id
@@ -1277,10 +1277,11 @@ def text_handler(message):
             desc = c_data['desc']
 
             final_text = (
-                f"🍔 **Горячий заказ в Бикини Боттом!**\n\n"
-                f"📌 **Платформа:** 🍔 {platform}\n"
-                f"💰 **Награда:** {payment} ₽\n"
-                f"📝 **Описание:** {desc}"
+                f"🍔 **Внимание, повара Бикини‑Боттома! Новый заказ на кухне «Красти Краб»!**\n\n"
+                f"📌 **Платформа:** {platform}\n\n"
+                f"💰 **Награда:** {payment} ₽\n\n"
+                f"📝 **Описание:** Задача легче, чем приготовить крабсбургер по секретному рецепту. Справится каждый!\n\n"
+                f"┃ `{desc}`"
             )
             
             user_creation_data[user_id]['final_text'] = final_text
@@ -1326,10 +1327,11 @@ def text_handler(message):
             desc = user_creation_data[user_id]['desc']
 
             final_text = (
-                f"🍔 **Горячий заказ в Бикини Боттом!**\n\n"
-                f"📌 **Платформа:** 🍔 {platform}\n"
-                f"💰 **Награда:** {payment} ₽\n"
-                f"📝 **Описание:** {desc}"
+                f"🍔 **Внимание, повара Бикини‑Боттома! Новый заказ на кухне «Красти Краб»!**\n\n"
+                f"📌 **Платформа:** {platform}\n\n"
+                f"💰 **Награда:** {payment} ₽\n\n"
+                f"📝 **Описание:** Задача легче, чем приготовить крабсбургер по секретному рецепту. Справится каждый!\n\n"
+                f"┃ `{desc}`"
             )
             
             user_creation_data[user_id]['final_text'] = final_text
