@@ -48,11 +48,11 @@ STATS_FILE = os.path.join(DATA_DIR, 'stats.json')
 USERNAMES_FILE = os.path.join(DATA_DIR, 'usernames.json')
 
 # ПРАВИЛА И ПАРАМЕТРЫ
-USER_COOLDOWN_TIME = 7200          # 2 часа кулдаун между постами одного юзера
+USER_COOLDOWN_TIME = 1800          # 30 минут кулдаун между постами одного юзера
 SLOT_STEP_MINUTES = 15             # Шаг сетки 15 минут
 MAX_AHEAD_HOURS = 2                # Максимум 2 часа вперед для брони
 AUTO_CLOSE_TIME = 3600             # 1 час для автозакрытия поста
-PLATFORM_COOLDOWN_SECONDS = 3600   # КД платформы: 1 час между сменами одной платформы
+PLATFORM_COOLDOWN_SECONDS = 5400   # КД платформы: 1,5 часа между сменами одной платформы
 REMINDER_BEFORE_SECONDS = 600      # напоминание за 10 минут до публикации брони
 MISSED_GRACE_SECONDS = 600         # если бот пропустил бронь не более чем на 10 мин - публикуем сразу, иначе отменяем
 
@@ -68,8 +68,8 @@ RULES_TEXT = """⚠️ <b>ПРАВИЛА БИКИНИ БОТТОМ ЗАРАБО�
 
 1. <b>Шаг сетки:</b> 15 минут. Бронь доступна максимум на 2 часа вперёд.
 2. <b>Ночной режим:</b> С 00:00 до 10:00 по МСК Бикини Боттон спит, публикация смен недоступна. Последнее время брони вечером — 23:45.
-3. <b>Кулдаун платформы:</b> Если на платформе забронирована смена, следующая смена на этой же платформе возможна только через 1 час.
-4. <b>Кулдаун сотрудника:</b> Между своими сменами необходимо выждать 2 часа.
+3. <b>Кулдаун платформы:</b> Если на платформе забронирована смена, следующая смена на этой же платформе возможна только через 1,5 часа.
+4. <b>Кулдаун сотрудника:</b> Между своими сменами необходимо выждать 30 минут.
 5. <b>Обязательна подписка</b> на наш канал.
 
 🚨 <i>За нарушение правил доступ аннулируется без возврата средств!</i>"""
@@ -483,13 +483,20 @@ def validate_slot(user_id, platform, slot_ts, scheduled_data, history, user_earl
     return True, 'ok', None
 
 
-def slot_error_text(code, extra, platform):
+def slot_error_text(code, extra, platform, slot_ts=None):
     if code == 'busy':
         return "❌ Этот временной слот уже занят другим поваром!"
     if code == 'platform':
         pname = str(platform)[:40]
+        free_from = fmt_hm(extra + PLATFORM_COOLDOWN_SECONDS)
+        if slot_ts is not None and slot_ts < extra:
+            # выбранный слот раньше существующей брони: смены оказались бы слишком близко
+            free_until = fmt_hm(extra - PLATFORM_COOLDOWN_SECONDS)
+            return (f"⏳ {pname} уже забронирована на {fmt_hm(extra)}. "
+                    f"Между сменами одной платформы должно пройти 1 ч 30 мин, этот слот слишком близко. "
+                    f"Выберите время не позже {free_until} или с {free_from}.")
         return (f"⏳ {pname} уже забронирована на {fmt_hm(extra)}. "
-                f"Следующая смена на этой платформе будет доступна с {fmt_hm(extra + PLATFORM_COOLDOWN_SECONDS)}.")
+                f"Следующая смена на этой платформе будет доступна с {free_from}.")
     if code == 'user':
         return "⏳ Этот слот попадает под ваш персональный кулдаун (или уже имеющуюся бронь)!"
     if code == 'past':
@@ -565,7 +572,8 @@ def get_available_slots_keyboard(user_id, platform_name):
             callback_data = "slot_busy"
         elif code == 'platform':
             btn_text = f"⏳ {slot_str} (КД платф.)"
-            callback_data = f"slot_pcd_{int(extra)}"
+            # в callback кладём и время брони-конфликта, и время самого слота
+            callback_data = f"slot_pcd_{int(extra)}_{int(slot_ts)}"
         else:
             btn_text = f"⏳ {slot_str} (Ваш КД)"
             callback_data = "slot_user_cooldown"
@@ -1323,8 +1331,10 @@ def callback_handler(call):
     elif call.data.startswith("slot_pcd_"):
         platform = user_creation_data.get(user_id, {}).get('platform', 'Платформа')
         try:
-            conflict_ts = float(call.data.replace("slot_pcd_", ""))
-            answer(call, slot_error_text('platform', conflict_ts, platform), True)
+            parts = call.data.replace("slot_pcd_", "").split("_")
+            conflict_ts = float(parts[0])
+            slot_ts_cb = float(parts[1]) if len(parts) > 1 else None
+            answer(call, slot_error_text('platform', conflict_ts, platform, slot_ts_cb), True)
         except Exception:
             answer(call, "⏳ Нельзя забронировать: КД этой платформы ещё не прошёл. Выберите время дальше!", True)
 
@@ -1383,7 +1393,7 @@ def callback_handler(call):
                 save_data(PLATFORM_HISTORY_FILE, history)
 
         if not ok:
-            answer(call, slot_error_text(code, extra, c_data['platform']), True)
+            answer(call, slot_error_text(code, extra, c_data['platform'], slot_ts), True)
             try:
                 bot.edit_message_reply_markup(
                     chat_id=call.message.chat.id,
