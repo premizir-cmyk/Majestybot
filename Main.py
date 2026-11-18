@@ -24,7 +24,7 @@ BOT_USERNAME = '@Qbodiq_bot'
 MY_USERNAME = '@premizir'
 
 # Владелец бота
-OWNER_ID = [7605961809,8980640998 ]
+OWNER_ID = [7605961809,8709405625 ]
 MAIN_ADMIN_ID = OWNER_ID[0]
 
 bot = telebot.TeleBot(TOKEN, threaded=True, num_threads=16)
